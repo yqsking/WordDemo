@@ -6,14 +6,14 @@ namespace WordDemo.Helpers
     public static class WordTableConfigHelper
     {
         /// <summary>
-        /// 获取单元格替换关系配置
+        /// 获取单元格替换项配置
         /// </summary>
         /// <returns></returns>
-        public static List<List<(string MatchItem,int Sort)>> GetCellReplaceRuleConfig()
+        public static List<KeyValuePair<string,string>> GetCellReplaceItemConfig()
         {
-            return new Dictionary<string, string>() {
-                { "年末数","年初数"},
-                { "本年","上年"}
+            return new List<KeyValuePair<string, string>> {
+               new KeyValuePair<string, string>("年末数","年初数"),
+               new KeyValuePair<string, string>("本年累计数","上年累计数")
             };
         }
 

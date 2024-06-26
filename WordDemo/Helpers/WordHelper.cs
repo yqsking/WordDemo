@@ -458,7 +458,7 @@ namespace WordDemo
             $"匹配OCR表格起始段落和单元格Range结束，耗时{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
             $"总共{tableList.Count}个表格，匹配成功{matchSuccessCount}个".Console(ConsoleColor.Yellow);
 
-            for (int tableIndex = 13; tableIndex <= tableList.Count; tableIndex++)
+            for (int tableIndex = 1; tableIndex <= tableList.Count; tableIndex++)
             {
                 var table = tableList[tableIndex];
                 //只有表格所有行都匹配到word段落且所有数据行单元格数量一致 才符合替换条件
@@ -844,9 +844,8 @@ namespace WordDemo
             if (string.IsNullOrWhiteSpace(replaceMatchItem))
             {
                 //包含匹配键值对
-                var replaceMatchItemDic = WordTableConfigHelper.GetCellReplaceRuleConfig();
-                var replaceMatchItemList = replaceMatchItemDic.Keys.Union(replaceMatchItemDic.Values).ToList();
-                replaceMatchItem = replaceMatchItemList.FirstOrDefault(matchKeyword => cellValue.Contains(matchKeyword));
+                var replaceMatchItemList = WordTableConfigHelper.GetCellReplaceItemConfig().Select(s => new string[] { s.Key, s.Value }).SelectMany(s => s).ToList();
+                replaceMatchItem = replaceMatchItemList.FirstOrDefault(matchItem => cellValue.Contains(matchItem));
                 replaceMatchItemType = ReplaceMatchItemTypeEnum.Keyword;
             }
             return (replaceMatchItem, replaceMatchItemType);
@@ -860,19 +859,19 @@ namespace WordDemo
         public static void SameTableCrossColumnReplace(WordTable table, List<ReplaceCell> replaceCells)
         {
             var allCellList = table.Rows.SelectMany(s => s.RowCells).ToList();
-            //要替换的表头移除掉匹配项文本 得到的表头单元格值应该是一致的
-            replaceCells.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
-            //根据表头新单元格值分组
-            var headCellValueGroupbyResults = replaceCells.GroupBy(g => g.CellValue).ToList();
-            foreach (var headCellValueGroupbyResult in headCellValueGroupbyResults)
+            if(replaceCells.All(w=>w.ReplaceMatchItemType==ReplaceMatchItemTypeEnum.Date))
             {
-                if (headCellValueGroupbyResult.Count() <= 1)
+                //如果匹配到的是日期 要替换的表头移除掉匹配项文本 得到的表头单元格值应该是一致的
+                replaceCells.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
+                //根据表头新单元格值分组
+                var headCellValueGroupbyResults = replaceCells.GroupBy(g => g.CellValue).ToList();
+                foreach (var headCellValueGroupbyResult in headCellValueGroupbyResults)
                 {
-                    continue;
-                }
-                if (headCellValueGroupbyResult.All(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date))
-                {
-                    //执行日期匹配项逻辑
+                    if (headCellValueGroupbyResult.Count() <= 1)
+                    {
+                        continue;
+                    }
+                    //所有替换数据匹配列根据匹配日期降序排序 
                     var replaceCellGroupResults = headCellValueGroupbyResult.OrderByDescending(o => o.ReplaceMatchItemDate).ToList();
                     var maxDateReplaceCell = replaceCellGroupResults.FirstOrDefault();
                     //判断当前表格是季度表还是年度表
@@ -890,6 +889,7 @@ namespace WordDemo
                             {
                                 cell.NewValue = "-";
                             }
+                            cell.IsReplaceValue = true;
                         });
 
                     //其他列依次从左往右平移
@@ -904,15 +904,44 @@ namespace WordDemo
                         .ForEach(cell =>
                         {
                             cell.NewValue = dataSourceCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
+                            cell.IsReplaceValue = true;
                         });
                     }
-                }
-                else
-                {
-                    //执行关键字匹配项逻辑
-                    WordTableConfigHelper.GetCellReplaceRuleConfig();
-                }
 
+                }
+            }
+            else
+            {
+                //如果匹配到的是关键字
+                var replaceItemList= WordTableConfigHelper.GetCellReplaceItemConfig();
+                var alreadyReplaceMatchItems = new List<string>();
+                foreach (var replaceCell in replaceCells)
+                {
+                    var replaceItem= replaceItemList.FirstOrDefault(w => w.Key == replaceCell.ReplaceMatchItem || w.Value == replaceCell.ReplaceMatchItem);
+                    var keyReplaceCell= replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Key);
+                    var valueReplaceCell= replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Value);
+                    if(keyReplaceCell!=null&&valueReplaceCell!=null)
+                    {
+                        if(!alreadyReplaceMatchItems.Contains(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem))
+                        {
+                            foreach(var cell in allCellList.Where(w=>w.StartColumnIndex==keyReplaceCell.Index&&!w.IsHeadColumn))
+                            {
+                                cell.NewValue = "-";
+                                cell.IsReplaceValue = true;
+                            }
+
+                            foreach(var cell in allCellList.Where(w => w.StartColumnIndex == valueReplaceCell.Index && !w.IsHeadColumn))
+                            {
+                                var dataSourceCell = allCellList.FirstOrDefault(w => w.StartColumnIndex == keyReplaceCell.Index && w.StartRowIndex == cell.StartRowIndex);
+                                cell.NewValue = dataSourceCell?.OldValue;
+                                cell.IsReplaceValue = true;
+                            }
+                         
+                            alreadyReplaceMatchItems.Add(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem);
+                        }
+                       
+                    }
+                }
             }
         }
 

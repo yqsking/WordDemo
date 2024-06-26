@@ -20,80 +20,11 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-
             GetOcrTableCellReplaceRule();
             
         }
 
-        static List<List<int>> FindConsecutiveSublists(List<int> numbers)
-        {
-            var result = new List<List<int>>();
-            var currentSublist = new List<int>();
-
-            if (numbers.Count == 0) return result;
-
-            // 初始化第一个元素的处理
-            currentSublist.Add(numbers[0]);
-
-            for (int i = 1; i < numbers.Count; i++)
-            {
-                // 检查当前元素是否与前一个连续
-                if (numbers[i] == numbers[i - 1] + 1)
-                {
-                    currentSublist.Add(numbers[i]);
-                }
-                else
-                {
-                    // 如果不连续，保存当前子序列并开始新的子序列
-                    result.Add(currentSublist);
-                    currentSublist = new List<int> { numbers[i] };
-                }
-            }
-
-            // 添加最后一个子序列到结果中
-            result.Add(currentSublist);
-
-            return result;
-        }
-
-        /// <summary>
-        /// 获取正常word表格替换规则
-        /// </summary>
-        /// <returns></returns>
-        private static List<WordTable> GetTableCellReplaceRule()
-        {
-            var wordTables = new List<WordTable>();
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/testTable.docx");
-            Application wordApp = new Application();
-            Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
-            doc.Activate();
-            int tableIndex = 1;
-            try
-            {
-                foreach (Table table in doc.Tables)
-                {
-                    $"正在解析第{tableIndex}个表格({table.Rows.Count}行,{table.Columns.Count}列)".Console();
-                    var wordTable = WordHelper.GetWordTable(table);
-                    wordTables.Add(wordTable);
-                    ++tableIndex;
-                }
-
-
-            }
-            catch (Exception ex)
-            {
-                $"解析第{tableIndex}个表格异常:{JsonConvert.SerializeObject(ex)}".Console(ConsoleColor.Red);
-            }
-            finally
-            {
-                doc.Save();
-                doc.Close();
-                wordApp.Quit();
-            }
-            return wordTables;
-        }
-
-
+       
         /// <summary>
         /// 获取制表位word表格替换规则
         /// </summary>
@@ -101,7 +32,8 @@ namespace WordDemo
         private static List<WordTable> GetOcrTableCellReplaceRule()
         {
             var wordTables = new List<WordTable>();
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_20240626143608_2.json");
             if (!File.Exists(jsonPath))
             {
                 Console.WriteLine("Json文件不存在");
@@ -109,7 +41,8 @@ namespace WordDemo
             string pdfJson = File.ReadAllText(jsonPath);
             //string pdfJson = GetPdfJson().GetAwaiter().GetResult();
             //return wordTables;
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
             if (!File.Exists(wordPath))
             {
                 Console.WriteLine("Word文件不存在");
@@ -186,7 +119,7 @@ namespace WordDemo
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             string createTaskUrl = $"{baseUrl}/{ApiConstant.CreateTask}";
             //中文
-            string pdfUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
+            string pdfUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
             var pdfStream = File.Open(pdfUrl, FileMode.Open);
             var createTaskRequest = new
             {

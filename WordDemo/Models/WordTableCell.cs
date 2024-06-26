@@ -21,9 +21,9 @@ namespace WordDemo
         public string NewValue { get; set; }
 
         /// <summary>
-        /// 操作类型
+        /// 是否替换值
         /// </summary>
-        public OperationTypeEnum OperationType { get; set; }
+        public bool IsReplaceValue { get; set; } = false;
 
         /// <summary>
         /// 单元格所在word中的范围
