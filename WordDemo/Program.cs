@@ -32,8 +32,8 @@ namespace WordDemo
         private static List<WordTable> GetOcrTableCellReplaceRule()
         {
             var wordTables = new List<WordTable>();
-            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_20240626143608_2.json");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_20240626143608_2.json");
             if (!File.Exists(jsonPath))
             {
                 Console.WriteLine("Json文件不存在");
@@ -41,8 +41,8 @@ namespace WordDemo
             string pdfJson = File.ReadAllText(jsonPath);
             //string pdfJson = GetPdfJson().GetAwaiter().GetResult();
             //return wordTables;
-            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
             if (!File.Exists(wordPath))
             {
                 Console.WriteLine("Word文件不存在");
@@ -52,7 +52,7 @@ namespace WordDemo
             doc.Activate();
             try
             {
-                wordTables = WordHelper.GetWordTabStopTableList(pdfJson,doc);
+                wordTables = WordHelper.GetWordTableList(pdfJson,doc);
 
             }
             catch (Exception ex)
