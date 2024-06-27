@@ -6,7 +6,7 @@ namespace WordDemo.Models
     public class ReplaceCell
     {
         /// <summary>
-        /// 单元格列索引
+        /// 单元格列索引(水平表头返回的是列索引，垂直表头返回的是行索引)
         /// </summary>
         public int Index { get; set; }
         /// <summary>
