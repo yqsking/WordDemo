@@ -10,6 +10,11 @@
         /// <summary>
         /// 改变颜色
         /// </summary>
-        ChangeColor=1
+        ChangeColor=1,
+
+        /// <summary>
+        /// 不操作
+        /// </summary>
+        NotOperation=2
     }
 }

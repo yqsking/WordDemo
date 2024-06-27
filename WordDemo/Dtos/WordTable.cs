@@ -110,7 +110,12 @@ namespace WordDemo
         /// <summary>
         /// 操作类型
         /// </summary>
-        public OperationTypeEnum OperationType { get; set; }
+        public OperationTypeEnum OperationType { get; set; } = OperationTypeEnum.NotOperation;
+
+        /// <summary>
+        /// 错误消息
+        /// </summary>
+        public List<string> ErrorMsgs { get; set; }= new List<string>();
 
     }
 }

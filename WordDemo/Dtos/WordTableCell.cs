@@ -71,11 +71,6 @@ namespace WordDemo
         public int ColSpan { get; set; } = 1;
 
         /// <summary>
-        /// 是否替换单元格
-        /// </summary>
-        public bool IsReplaceCell { get; set; }
-
-        /// <summary>
         /// 是否表头
         /// </summary>
         public bool IsHeadColumn { get; set; }
@@ -115,6 +110,9 @@ namespace WordDemo
         /// </summary>
         public List<WordTableCell> ChilderCells=new List<WordTableCell>();
 
+        /// <summary>
+        /// y轴坐标差
+        /// </summary>
         public decimal YPositiondifference { get; set; }
 
     }
