@@ -19,8 +19,11 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-            GetOcrTableCellReplaceRule();
-            
+            //GetOcrTableCellReplaceRule();
+            string content = "2023年12月31日演唱会";
+            var newDate = new DateTime(2024, 1, 1);
+            string newContent= content.Replace("2023年12月31日", $"{newDate.Year}年{newDate.Month}月{newDate.Day}日");
+            newContent.Console();
         }
 
        
