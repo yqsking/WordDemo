@@ -328,7 +328,7 @@ namespace WordDemo
             #region 
             watch.Restart();
             int lastTableIndex = tableList.IndexOf(tableList.LastOrDefault());
-            for (int tableIndex = 14; tableIndex < tableList.Count; tableIndex++)
+            for (int tableIndex = 0; tableIndex < tableList.Count; tableIndex++)
             {
                 string errorMsg = string.Empty;
                 var table = tableList[tableIndex];
