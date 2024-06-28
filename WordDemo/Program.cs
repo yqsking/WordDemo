@@ -19,14 +19,10 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-            //GetOcrTableCellReplaceRule();
-            string content = "2023年12月31日演唱会";
-            var newDate = new DateTime(2024, 1, 1);
-            string newContent= content.Replace("2023年12月31日", $"{newDate.Year}年{newDate.Month}月{newDate.Day}日");
-            newContent.Console();
+             GetOcrTableCellReplaceRule();
         }
 
-       
+
         /// <summary>
         /// 获取制表位word表格替换规则
         /// </summary>
@@ -54,7 +50,7 @@ namespace WordDemo
             doc.Activate();
             try
             {
-                wordTables = WordHelper.GetWordTableList(pdfJson,doc);
+                wordTables = WordHelper.GetWordTableList(pdfJson, doc);
 
             }
             catch (Exception ex)
@@ -131,8 +127,8 @@ namespace WordDemo
                 mode = 2,
                 priority = 1,
                 is_use_physical_lines = true,
-                physical_lines_interval=1,//y轴坐标误差小于0.1的算同行
-                physical_lines_precise =2,//0:按y轴下标取整计算物理行 1：按y轴下标取一位小数计算物理行 2：按y轴下标取2位小数计算物理行
+                physical_lines_interval = 1,//y轴坐标误差小于0.1的算同行
+                physical_lines_precise = 2,//0:按y轴下标取整计算物理行 1：按y轴下标取一位小数计算物理行 2：按y轴下标取2位小数计算物理行
             };
             var createTaskParamter = new MultipartFormDataContent
             {
