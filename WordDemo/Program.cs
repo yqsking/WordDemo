@@ -19,7 +19,8 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-             GetOcrTableCellReplaceRule();
+           
+            GetOcrTableCellReplaceRule();
         }
 
 

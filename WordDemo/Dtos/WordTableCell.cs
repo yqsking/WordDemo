@@ -1,6 +1,5 @@
 ﻿using Microsoft.Office.Interop.Word;
 using System.Collections.Generic;
-using WordDemo.Enums;
 using WordDemo.Models;
 
 namespace WordDemo

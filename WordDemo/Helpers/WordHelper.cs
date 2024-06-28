@@ -259,7 +259,14 @@ namespace WordDemo
                         table.ContentParagraphs = rangeParagraphList.Where(w => w.ParagraphNumber >= table.TableContentStartParagraphNumber &&
                             w.ParagraphNumber <= table.TableContentEndParagraphNumber).ToList();
 
-                        $"表格内容字体大小：{table.ContentParagraphs.FirstOrDefault()?.Range.Font.Size ?? 0}磅".Console(ConsoleColor.Yellow);
+                        //判断匹配到Range的表格是否有表头
+                        if(!table.Rows.Any(w=>w.IsHeadRow))
+                        {
+                            //补充表头
+                            var topFiveParagraphs = paragraphList.Where(w => w.ParagraphNumber < table.TableContentStartParagraphNumber)
+                                .OrderByDescending(o => o.ParagraphNumber).Take(5).OrderBy(o => o.ParagraphNumber).ToList();
+                            table.Rows= FillHeadColumnRow(table.Rows,topFiveParagraphs);
+                        }
 
                         //匹配单元格Range
                         foreach (WordTableRow row in table.Rows)
@@ -1578,6 +1585,17 @@ namespace WordDemo
             cellValue = Regex.Replace(cellValue, @"\d{1,2}日", nextMaxDate.Value.Day + "日");
             return cellValue;
 
+        }
+
+        /// <summary>
+        /// 填充表头
+        /// </summary>
+        /// <param name="rows">表格所有行</param>
+        /// <param name="topFiveParagraphs">前五个段落</param>
+        /// <returns></returns>
+        private static List<WordTableRow> FillHeadColumnRow(List<WordTableRow> rows,List<WordParagraph> topFiveParagraphs)
+        {
+            return rows;
         }
         #endregion
 
