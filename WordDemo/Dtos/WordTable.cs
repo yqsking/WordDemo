@@ -59,6 +59,11 @@ namespace WordDemo
         public List<WordParagraph> ContentParagraphs { get; set; }= new List<WordParagraph>();
 
         /// <summary>
+        /// 是否制表位表格
+        /// </summary>
+        public bool IsTabStopTable => ContentParagraphs.All(w => w.Range.Text.Contains("\r\a"));
+
+        /// <summary>
         /// 表格在word的段落 过滤纯下划线段落
         /// </summary>
         public List<WordParagraph> FilterContentParagraphs => ContentParagraphs.Where(w => !w.Text.ToList().All(text => text.ToString() == "_")).ToList();

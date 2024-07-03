@@ -5,16 +5,21 @@
         /// <summary>
         /// 替换值
         /// </summary>
-        ReplaceText=0,
+        ReplaceText = 0,
 
         /// <summary>
-        /// 改变颜色
+        /// 输出错误信息
         /// </summary>
-        ChangeColor=1,
+        ConsoleError = 1,
+
+        /// <summary>
+        /// 输出错误信息且改变表头颜色
+        /// </summary>
+        ChangeColor = 2,
 
         /// <summary>
         /// 不操作
         /// </summary>
-        NotOperation=2
+        NotOperation = 3
     }
 }

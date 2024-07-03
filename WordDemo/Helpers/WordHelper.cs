@@ -255,71 +255,42 @@ namespace WordDemo
                     if (table.TableContentStartParagraphNumber > 0 && table.TableContentEndParagraphNumber > 0)
                     {
                         $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent}),表格文字高度：{table.FontHeight},从第{table.TableContentStartParagraphNumber}个段落开始,到第{table.TableContentEndParagraphNumber}个段落结束".Console(ConsoleColor.Yellow);
+                       
+                        var topFiveParagraphs = paragraphList.Where(w => w.ParagraphNumber < table.TableContentStartParagraphNumber)
+                          .OrderByDescending(o => o.ParagraphNumber).Take(5).OrderBy(o => o.ParagraphNumber).ToList();
+                       
+                        //如果表头为空，重新计算表头 ;如果数据行单元格不全，补充空单元格
+                        SupplementCell(table, topFiveParagraphs);
+
                         table.IsMatchWordParagraph = true;
                         table.ContentParagraphs = rangeParagraphList.Where(w => w.ParagraphNumber >= table.TableContentStartParagraphNumber &&
                             w.ParagraphNumber <= table.TableContentEndParagraphNumber).ToList();
 
-                        //判断匹配到Range的表格是否有表头
-                        if(!table.Rows.Any(w=>w.IsHeadRow))
+                        if(!table.IsTabStopTable)
                         {
-                            //补充表头
-                            var topFiveParagraphs = paragraphList.Where(w => w.ParagraphNumber < table.TableContentStartParagraphNumber)
-                                .OrderByDescending(o => o.ParagraphNumber).Take(5).OrderBy(o => o.ParagraphNumber).ToList();
-                            table.Rows= FillHeadColumnRow(table.Rows,topFiveParagraphs);
-                        }
-
-                        //匹配单元格Range
-                        foreach (WordTableRow row in table.Rows)
-                        {
-                            Range rowRange = table.ContentParagraphs.Where(w => w.Text.Contains(row.RowContent)).FirstOrDefault()?.Range;
-                            if (rowRange == null)
-                            {
-                                $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})第{row.RowNumber}行({row.RowContent})未能找到匹配段落".Console(ConsoleColor.Red);
-                                continue;
-                            }
-                            row.IsMatchRowRange = true;
-                            row.Range = rowRange;
-                            Range rowRangeCopy = rowRange.Duplicate;
-                            foreach (var cell in row.RowCells)
-                            {
-                                if (string.IsNullOrWhiteSpace(cell.OldValue))
-                                {
-                                    continue;
-                                }
-                                string rowRangeText = rowRangeCopy.Text;
-                                Range cellRange = rowRangeCopy.Duplicate;
-                                int cellStartIndex = rowRangeText.IndexOf(cell.OldValue);
-                                int cellEndIndex = cellStartIndex + cell.OldValue.Length;
-                                int moveNumber = rowRangeCopy.Text.Length - cellEndIndex;
-                                cellRange.MoveStart(WdUnits.wdCharacter, cellStartIndex);
-                                cellRange.MoveEnd(WdUnits.wdCharacter, -moveNumber);
-                                cell.Range = cellRange;
-                                rowRangeCopy.MoveStart(WdUnits.wdCharacter, cellEndIndex);
-                            }
+                            MatchTabStopTableCellRange(table);
                         }
                         break;
                     }
-
                 }
 
                 if (table.TableContentStartParagraphNumber <= 0 || table.TableContentEndParagraphNumber <= 0)
                 {
-                    $"第{table.PageNumber}页第{table.TableNumber}个表格未能匹配到Range,表格文本高度：{table.FontHeight}".Console(ConsoleColor.Red);
-                    var tableFirstThreeLineTextStr = new StringBuilder();
+                    var errorMsg = new StringBuilder();
+                    errorMsg.AppendLine( $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能匹配到Word段落!");
+                    errorMsg.AppendLine("OCR识别到的表格前三条内容：");
                     tableFirstThreeLineTexts.ForEach(f =>
                     {
-                        tableFirstThreeLineTextStr.AppendLine(f);
+                        errorMsg.AppendLine(f);
                     });
-                    $"OCR识别到的表格前三条内容：".Console(ConsoleColor.Yellow);
-                    tableFirstThreeLineTextStr.ToString().Console(ConsoleColor.Blue);
-
-                    var tableLastThreeLineTextStr = new StringBuilder();
+                    errorMsg.AppendLine("OCR识别到的表格后三条内容：");
                     tableLastThreeLineTexts.ForEach(f =>
                     {
-                        tableLastThreeLineTextStr.AppendLine(f);
+                        errorMsg.AppendLine(f);
                     });
-                    $"OCR识别到的表格后三条内容：".Console(ConsoleColor.Yellow);
-                    tableLastThreeLineTextStr.ToString().Console(ConsoleColor.Blue);
+                    table.OperationType = OperationTypeEnum.ChangeColor;
+                    table.ErrorMsgs.Add(errorMsg.ToString());
+                    errorMsg.ToString().Console(ConsoleColor.Red);
                 }
             }
 
@@ -428,6 +399,7 @@ namespace WordDemo
 
             $"解析表格单元格替换规则总耗时：{totalTime}秒".Console(ConsoleColor.Yellow);
 
+           
             return tableList;
         }
 
@@ -1588,14 +1560,188 @@ namespace WordDemo
         }
 
         /// <summary>
-        /// 填充表头
+        /// 补充单元格
         /// </summary>
         /// <param name="rows">表格所有行</param>
         /// <param name="topFiveParagraphs">前五个段落</param>
         /// <returns></returns>
-        private static List<WordTableRow> FillHeadColumnRow(List<WordTableRow> rows,List<WordParagraph> topFiveParagraphs)
+        private static void SupplementCell(WordTable table,List<WordParagraph> topFiveParagraphs)
         {
-            return rows;
+            //补全数据行单元格
+            int maxDataRowCellCount = table.DataRows.Max(m => m.RowCells.Count);
+            var lessThanMaxDataRowCellCountAllRowList = table.DataRows.Where(w => w.RowCells.Count < maxDataRowCellCount).ToList();
+            if (lessThanMaxDataRowCellCountAllRowList.Any())
+            {
+                foreach (var row in lessThanMaxDataRowCellCountAllRowList)
+                {
+                    for (int cellIndex = 1; cellIndex <= maxDataRowCellCount; cellIndex++)
+                    {
+                        var cell = row.RowCells.FirstOrDefault(w => w.StartColumnIndex == cellIndex);
+                        if (cell == null)
+                        {
+                            cell = new WordTableCell
+                            {
+                                StartRowIndex = row.RowNumber,
+                                StartColumnIndex = cellIndex,
+                                OldValue = "",
+                            };
+                            row.RowCells.Add(cell);
+                        }
+                    }
+                    row.RowCells = row.RowCells.OrderBy(o => o.StartColumnIndex).ToList();
+                }
+
+            }
+
+            //补全表头
+            if(!table.HeadRows.Any())
+            {
+                //从下往上验证是否是表头段落
+                topFiveParagraphs.Reverse();
+                //标题类型：一、 1. （1） (1) (a)（a）（ii）（ii）
+                var titlePatterns = new string[] {
+                   @"^[零一二三四五六七八九十]+、", //一、
+                   @"^\d+\.",//1.
+                   @"^（\d+）",//（1）
+                   @"^\(\d+\)",//(1)
+                   @"^\d+\)",//1)
+                   @"^（[a-z]+）",//（a）
+                   @"^\([a-z]+\)",//(a)
+                   @"^（[A-Z]+）",//（a）（ii）
+                   @"^\([A-Z]+\)",//(a) （ii）
+                };
+                var headRowParagraphList = new List<WordParagraph>();
+                foreach (var paragraph in topFiveParagraphs)
+                {
+                    if (!paragraph.Range.Text.Contains("\t"))
+                    {
+                        //段落不包含\t 
+                        break;
+                    }
+                    if(titlePatterns.Any(pattern=>Regex.IsMatch(paragraph.Range.Text,pattern))&&paragraph.Range.Text.Count()<50)
+                    {
+                        //段落是标题
+                        break;
+                    }
+                    if(Regex.IsMatch( paragraph.Range.Text,@"[0-9]{3},"))
+                    {
+                        //表头不包含三位数，
+                        break;
+                    }
+                    headRowParagraphList.Add(paragraph);
+                }
+
+                if(headRowParagraphList.Any())
+                {
+                    var paragraphSplitResultList= headRowParagraphList.OrderBy(o=>o.ParagraphNumber).Select(s => s.Range.Text.Split('\t')).ToList();
+                    if(paragraphSplitResultList.All(w=>w.Count()== maxDataRowCellCount))
+                    {
+                        //分割后 所有表头行单元格数量都与最大数据行单元格数量一致 代表表头有效
+                        var tableRowList = new List<WordTableRow>();
+                        for(int rowIndex=0; rowIndex<paragraphSplitResultList.Count; rowIndex++)
+                        {
+                            var currentRowSplitResult= paragraphSplitResultList[rowIndex];
+                            var row = new WordTableRow() { 
+                               RowNumber=rowIndex+1,
+                            };
+                            for(int cellIndex=0;cellIndex<currentRowSplitResult.Count();cellIndex++)
+                            {
+                                row.RowCells.Add(new WordTableCell { 
+                                  OldValue= currentRowSplitResult[cellIndex].RemoveSpaceAndEscapeCharacter(),
+                                  StartRowIndex=rowIndex,
+                                  StartColumnIndex=cellIndex,
+                                  IsHeadColumn =true,
+                                });
+                            }
+                            tableRowList.Add(row);
+                        }
+
+                        //重新加入数据行
+                        foreach(var row in table.DataRows)
+                        {
+                            //重新计算数据行的行数和数据行单元格所在行数
+                            row.RowNumber = tableRowList.Count + 1;
+                            foreach(var cell in row.RowCells)
+                            {
+                                cell.StartRowIndex = row.RowNumber;
+                            }
+                            tableRowList.Add(row);
+                        }
+
+                        table.Rows = tableRowList;
+                        table.TableContentStartParagraphNumber = headRowParagraphList.Min(w => w.ParagraphNumber);
+                    }
+                }
+            }
+
+
+
+        }
+
+        /// <summary>
+        /// 匹配制表位表格单元格Range
+        /// </summary>
+        /// <param name="table"></param>
+        private static void MatchTabStopTableCellRange(WordTable table)
+        {
+            foreach (WordTableRow row in table.Rows)
+            {
+                Range rowRange = table.ContentParagraphs.Where(w => w.Text.Contains(row.RowContent)).FirstOrDefault()?.Range;
+                if (rowRange == null)
+                {
+                    string errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})第{row.RowNumber}行({row.RowContent})未能匹配到Word段落!";
+                    table.ErrorMsgs.Add(errorMsg);
+                    table.OperationType = OperationTypeEnum.ChangeColor;
+                    errorMsg.Console(ConsoleColor.Red);
+                    break;
+                }
+                row.IsMatchRowRange = true;
+                row.Range = rowRange;
+                string rowRangeText = row.Range.Text;
+                int lastColumnIndex = row.RowCells.LastOrDefault().StartColumnIndex;
+                int nextCellStartIndex = 0;
+                foreach (var cell in row.RowCells)
+                {
+                    string cellIndexValue = string.Empty;
+                    if (cell.StartColumnIndex != lastColumnIndex)
+                    {
+                        cellIndexValue = cell.OldValue + "\t";
+                    }
+                    else
+                    {
+                        cellIndexValue = cell.OldValue + "\r";
+                    }
+
+                    Range cellRange = row.Range.Duplicate;
+                    int? cellStartIndex = null;
+                    if (string.IsNullOrWhiteSpace(cell.OldValue))
+                    {
+                        if (cell.StartColumnIndex != lastColumnIndex)
+                        {
+                            //空单元格用\t定位Range
+                            cellStartIndex = rowRangeText.IndexOf("\t", nextCellStartIndex);
+                        }
+                        else
+                        {
+                            //最后一个空单元格用\r定位Range
+                            cellStartIndex = rowRangeText.IndexOf("\r", nextCellStartIndex);
+                        }
+                    }
+                    else
+                    {
+                        cellStartIndex = rowRangeText.IndexOf(cell.OldValue, nextCellStartIndex);
+                    }
+
+                    int cellEndIndex = cellStartIndex.Value + cellIndexValue.Length;
+                    int moveNumber = rowRangeText.Length - cellEndIndex;
+                    cellRange.MoveStart(WdUnits.wdCharacter, cellStartIndex);
+                    cellRange.MoveEnd(WdUnits.wdCharacter, -moveNumber);
+                    cell.Range = cellRange;
+                    nextCellStartIndex = cellEndIndex;
+                    string moveCellValue = cell.Range.Text;
+
+                }
+            }
         }
         #endregion
 
