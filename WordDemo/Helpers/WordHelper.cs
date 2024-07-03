@@ -161,12 +161,12 @@ namespace WordDemo
             Paragraph while_paragraph = doc.Paragraphs.First;
             while (while_paragraph != null)
             {
-                if (string.IsNullOrWhiteSpace(while_paragraph.Range.Text.RemoveSpaceAndEscapeCharacter()))
-                {
-                    //跳过空段落
-                    while_paragraph = while_paragraph.Next();
-                    continue;
-                }
+                //if (string.IsNullOrWhiteSpace(while_paragraph.Range.Text.RemoveSpaceAndEscapeCharacter()))
+                //{
+                //    //跳过空段落
+                //    while_paragraph = while_paragraph.Next();
+                //    continue;
+                //}
                 int wdActiveEndPageNumber = Convert.ToInt32(while_paragraph.Range.Information[WdInformation.wdActiveEndPageNumber]);
                 if (while_paragraph.Range.Tables.Count > 0)
                 {
@@ -178,6 +178,7 @@ namespace WordDemo
                     if (firstAndLastRowText != preTableFirstAndLastRowText)
                     {
                         var normalTable = GetWordTable(paragraphTable);
+                        int tableContentStartParagraphNumber = paragraphList.Count() + 1;
                         foreach (var row in normalTable.Rows)
                         {
                             if (string.IsNullOrWhiteSpace(row.RowContent.RemoveSpaceAndEscapeCharacter()))
@@ -192,9 +193,15 @@ namespace WordDemo
                                 ParagraphNumber = paragraphList.Count + 1,
                                 OldText=row.RowContent,
                                 Text = row.RowContent.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
-                                Range = row.Range
+                                Range = row.Range,
+                                IsUsed = true
                             });
                         }
+                        int tableContentEndParagraphNumber = paragraphList.Count;
+                        normalTable.TableNumber = normalTableList.Count + 1;
+                        normalTable.PageNumber = wdActiveEndPageNumber;
+                        normalTable.TableContentStartParagraphNumber = tableContentStartParagraphNumber;
+                        normalTable.TableContentEndParagraphNumber = tableContentEndParagraphNumber;
                         normalTableList.Add(normalTable);
                         prevTableFirstRowContent = firstAndLastRowContent.FirstRowContent;
                         prevTableLastRowContent = firstAndLastRowContent.LastRowContent;
@@ -317,103 +324,22 @@ namespace WordDemo
             $"匹配OCR表格起始段落和单元格Range结束，耗时{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
             $"总共{tableList.Count}个表格，匹配成功{matchSuccessCount}个;有{tableList.Count(w=>w.IsTabStopTable)}个制表位表格,{normalTableList.Count}个正常表格".Console(ConsoleColor.Yellow);
 
-
             $"开始生成单元格新值。。。".Console(ConsoleColor.Yellow);
             #region 
             watch.Restart();
-            int lastTableIndex = tableList.IndexOf(tableList.LastOrDefault());
-            for (int tableIndex = 0; tableIndex < tableList.Count; tableIndex++)
+            //生成制表位单元格新值
+            BuildTabStopTableCellNewValue(tableList);
+
+            //生成正常表格单元格新值
+            if(normalTableList.Any())
             {
-                string errorMsg = string.Empty;
-                var table = tableList[tableIndex];
-                try
+                BuildNormalTableCellNewValue(normalTableList);
+                foreach(var normalTable in normalTableList)
                 {
-                    if (!table.IsMatchWordParagraph || table.Rows.Any(w => !w.IsMatchRowRange))
-                    {
-                        errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能匹配到Word段落范围";
-                        table.OperationType = OperationTypeEnum.ChangeColor;
-                        table.ErrorMsgs.Add(errorMsg);
-                        errorMsg.Console(ConsoleColor.Red);
-                        continue;
-                    }
-                    if (!table.HeadRows.Any())
-                    {
-                        errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能识别到表头";
-                        table.OperationType = OperationTypeEnum.ChangeColor;
-                        table.ErrorMsgs.Add(errorMsg);
-                        errorMsg.Console(ConsoleColor.Red);
-                        continue;
-                    }
-
-                    //同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
-                    var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(table.HeadRows);
-                    var needReplaceHorizontalHeadCellList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
-                    if (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
-                        needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
-                    {
-                        //执行同表跨列替换逻辑
-                        SameTableCrossColumnReplace(table, needReplaceHorizontalHeadCellList);
-                        table.OperationType = OperationTypeEnum.ReplaceText;
-                        continue;
-                    }
-
-                    //同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
-                    var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
-                    var needReplaceVerticalHeadRowCellList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
-                    if (needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
-                        needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
-                    {
-                        //执行同表跨行替换逻辑
-                        SameTableCrossRowReplace(table, needReplaceVerticalHeadRowCellList);
-                        table.OperationType = OperationTypeEnum.ReplaceText;
-                        continue;
-                    }
-
-                    //跨表上下替换 只有当前表非最后一个表格且与下一个表格表头除了匹配项完全一致
-                    if (tableIndex < lastTableIndex)
-                    {
-                        var nextTable = tableList[tableIndex + 1];
-                        //判断下一个表是否符合替换条件 
-                        if (nextTable.IsMatchWordParagraph && nextTable.Rows.All(w => w.IsMatchRowRange))
-                        {
-                            //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
-                            //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
-                            var nextTableHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(nextTable.HeadRows);
-                            var nextTableNeedReplaceHorizontalHeadCellList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
-                            string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
-                            string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
-                            if (tableHeadRowContent == nextTableHeadRowContent
-                                && needReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1
-                                && nextTableNeedReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1)
-                            {
-                                //执行跨表替换逻辑
-                                CrossTableReplace(table, needReplaceHorizontalHeadCellList, nextTable, nextTableNeedReplaceHorizontalHeadCellList);
-                                table.OperationType = OperationTypeEnum.ReplaceText;
-                                nextTable.OperationType = OperationTypeEnum.ReplaceText;
-                                //循环跳过下一个表
-                                tableIndex++;
-
-                            }
-                        }
-
-                    }
-                    //lxz 2024-07-01 添加逻辑
-                    //表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
-                    if (table.OperationType == OperationTypeEnum.NotOperation
-                        && (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 1
-                            || needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 1))
-                    {
-                        table.OperationType = OperationTypeEnum.ChangeColor;
-                    }
+                    normalTable.TableNumber = tableList.Count + 1;
+                    tableList.Add(normalTable);
                 }
-                catch (Exception ex)
-                {
-                    errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})生成单元格新值失败，{ex.Message}";
-                    table.OperationType = OperationTypeEnum.ChangeColor;
-                    table.ErrorMsgs.Add(errorMsg);
-                    errorMsg.Console(ConsoleColor.Red);
-                    ex.StackTrace.Console(ConsoleColor.Red);
-                }
+                tableList = tableList.OrderBy(o => o.TableContentStartParagraphNumber).ToList();
             }
             watch.Stop();
             totalTime += watch.ElapsedMilliseconds / 10000;
@@ -573,6 +499,93 @@ namespace WordDemo
             }
 
             return mergeCount;
+        }
+
+        /// <summary>
+        /// 生成正常表格新值
+        /// </summary>
+        /// <param name="tables"></param>
+        private static void BuildNormalTableCellNewValue(List<WordTable> tables)
+        {
+            int lastTableIndex = tables.IndexOf(tables.LastOrDefault());
+            for (int tableIndex = 0; tableIndex < tables.Count; tableIndex++)
+            {
+                string errorMsg = string.Empty;
+                var table = tables[tableIndex];
+                try
+                {
+                  
+                    //同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
+                    var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(table.HeadRows);
+                    var needReplaceHorizontalHeadCellList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                    if (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
+                        needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
+                    {
+                        //执行同表跨列替换逻辑
+                        SameTableCrossColumnReplace(table, needReplaceHorizontalHeadCellList);
+                        table.OperationType = OperationTypeEnum.ReplaceText;
+                        continue;
+                    }
+
+                    //同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
+                    var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
+                    var needReplaceVerticalHeadRowCellList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                    if (needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
+                        needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
+                    {
+                        //执行同表跨行替换逻辑
+                        SameTableCrossRowReplace(table, needReplaceVerticalHeadRowCellList);
+                        table.OperationType = OperationTypeEnum.ReplaceText;
+                        continue;
+                    }
+
+                    //跨表上下替换 只有当前表非最后一个表格且与下一个表格表头除了匹配项完全一致 
+                    if (tableIndex < lastTableIndex)
+                    {
+                        var nextTable = tables[tableIndex + 1];
+                        //两个表格所在页码数最多差一页
+                        if (Math.Abs(table.PageNumber-nextTable.PageNumber)<=1)
+                        {
+                            //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
+                            //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
+                            var nextTableHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(nextTable.HeadRows);
+                            var nextTableNeedReplaceHorizontalHeadCellList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                            string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
+                            string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
+                            if (tableHeadRowContent == nextTableHeadRowContent
+                                && needReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1
+                                && nextTableNeedReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1)
+                            {
+                                //执行跨表替换逻辑
+                                CrossTableReplace(table, needReplaceHorizontalHeadCellList, nextTable, nextTableNeedReplaceHorizontalHeadCellList);
+                                table.OperationType = OperationTypeEnum.ReplaceText;
+                                nextTable.OperationType = OperationTypeEnum.ReplaceText;
+                                //循环跳过下一个表
+                                tableIndex++;
+
+                            }
+                        }
+
+                    }
+
+                    //lxz 2024-07-01 添加逻辑
+                    //表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
+                    if (table.OperationType == OperationTypeEnum.NotOperation
+                        && (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 1
+                            || needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 1))
+                    {
+                        table.OperationType = OperationTypeEnum.ChangeColor;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})生成单元格新值失败，{ex.Message}";
+                    table.OperationType = OperationTypeEnum.ChangeColor;
+                    table.ErrorMsgs.Add(errorMsg);
+                    errorMsg.Console(ConsoleColor.Red);
+                    ex.StackTrace.Console(ConsoleColor.Red);
+                }
+            }
         }
 
         #endregion
@@ -1732,7 +1745,7 @@ namespace WordDemo
                 {
                     string errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})第{row.RowNumber}行({row.RowContent})未能匹配到Word段落!";
                     table.ErrorMsgs.Add(errorMsg);
-                    table.OperationType = OperationTypeEnum.ChangeColor;
+                    table.OperationType = OperationTypeEnum.ConsoleError;
                     errorMsg.Console(ConsoleColor.Red);
                     break;
                 }
@@ -1781,6 +1794,105 @@ namespace WordDemo
                     nextCellStartIndex = cellEndIndex;
                     string moveCellValue = cell.Range.Text;
 
+                }
+            }
+        }
+
+        /// <summary>
+        /// 生成制表位表格单元格新值
+        /// </summary>
+        /// <param name="tables"></param>
+        private static void BuildTabStopTableCellNewValue(List<WordTable> tables)
+        {
+            int lastTableIndex = tables.IndexOf(tables.LastOrDefault());
+            for (int tableIndex = 0; tableIndex < tables.Count; tableIndex++)
+            {
+                string errorMsg = string.Empty;
+                var table = tables[tableIndex];
+                try
+                {
+                    if (!table.IsMatchWordParagraph || table.Rows.Any(w => !w.IsMatchRowRange))
+                    {
+                        continue;
+                    }
+                    if (!table.HeadRows.Any())
+                    {
+                        errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能识别到表头";
+                        table.OperationType = OperationTypeEnum.ChangeColor;
+                        table.ErrorMsgs.Add(errorMsg);
+                        errorMsg.Console(ConsoleColor.Red);
+                        continue;
+                    }
+
+                    //同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
+                    var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(table.HeadRows);
+                    var needReplaceHorizontalHeadCellList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                    if (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
+                        needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
+                    {
+                        //执行同表跨列替换逻辑
+                        SameTableCrossColumnReplace(table, needReplaceHorizontalHeadCellList);
+                        table.OperationType = OperationTypeEnum.ReplaceText;
+                        continue;
+                    }
+
+                    //同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
+                    var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
+                    var needReplaceVerticalHeadRowCellList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                    if (needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 2 ||
+                        needReplaceVerticalHeadRowCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 2)
+                    {
+                        //执行同表跨行替换逻辑
+                        SameTableCrossRowReplace(table, needReplaceVerticalHeadRowCellList);
+                        table.OperationType = OperationTypeEnum.ReplaceText;
+                        continue;
+                    }
+
+                    //跨表上下替换 只有当前表非最后一个表格且与下一个表格表头除了匹配项完全一致
+                    if (tableIndex < lastTableIndex)
+                    {
+                        var nextTable = tables[tableIndex + 1];
+                        //判断下一个表是否符合替换条件 
+                        if (nextTable.IsMatchWordParagraph && nextTable.Rows.All(w => w.IsMatchRowRange))
+                        {
+                            //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
+                            //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
+                            var nextTableHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(nextTable.HeadRows);
+                            var nextTableNeedReplaceHorizontalHeadCellList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
+                            string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
+                            string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceDate();
+                            if (tableHeadRowContent == nextTableHeadRowContent
+                                && needReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1
+                                && nextTableNeedReplaceHorizontalHeadCellList.GroupBy(g => g.ReplaceMatchItem).Count() == 1)
+                            {
+                                //执行跨表替换逻辑
+                                CrossTableReplace(table, needReplaceHorizontalHeadCellList, nextTable, nextTableNeedReplaceHorizontalHeadCellList);
+                                table.OperationType = OperationTypeEnum.ReplaceText;
+                                nextTable.OperationType = OperationTypeEnum.ReplaceText;
+                                //循环跳过下一个表
+                                tableIndex++;
+
+                            }
+                        }
+
+                    }
+
+                    //lxz 2024-07-01 添加逻辑
+                    //表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
+                    if (table.OperationType == OperationTypeEnum.NotOperation
+                        && (needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).GroupBy(g => g.ReplaceMatchItem).Count() >= 1
+                            || needReplaceHorizontalHeadCellList.Where(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count() >= 1))
+                    {
+                        table.OperationType = OperationTypeEnum.ChangeColor;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})生成单元格新值失败，{ex.Message}";
+                    table.OperationType = OperationTypeEnum.ChangeColor;
+                    table.ErrorMsgs.Add(errorMsg);
+                    errorMsg.Console(ConsoleColor.Red);
+                    ex.StackTrace.Console(ConsoleColor.Red);
                 }
             }
         }
