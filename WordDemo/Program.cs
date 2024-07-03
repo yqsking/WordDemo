@@ -31,21 +31,24 @@ namespace WordDemo
         private static List<WordTable> GetOcrTableCellReplaceRule()
         {
             var wordTables = new List<WordTable>();
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
-            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_20240626143608_2.json");
-            if (!File.Exists(jsonPath))
-            {
-                Console.WriteLine("Json文件不存在");
-            }
-            string pdfJson = File.ReadAllText(jsonPath);
-            //string pdfJson = GetPdfJson().GetAwaiter().GetResult();
-            //return wordTables;
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            ////制表位日期
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
+
+            ////制表位关键字
             //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
-            if (!File.Exists(wordPath))
-            {
-                Console.WriteLine("Word文件不存在");
-            }
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
+
+            //常规表格
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.pdf");
+
+            string pdfJson = File.ReadAllText(jsonPath);
+            //string pdfJson = GetPdfJson(pdfPath).GetAwaiter().GetResult();
+            //return wordTables;
             Application wordApp = new Application();
             Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
             doc.Activate();
@@ -68,7 +71,7 @@ namespace WordDemo
 
         }
 
-        private static async Task<string> GetPdfJson()
+        private static async Task<string> GetPdfJson(string pdfUrl)
         {
             "开始获取pdf json数据".Console(ConsoleColor.Yellow);
             var watch = new Stopwatch();
@@ -117,8 +120,6 @@ namespace WordDemo
             client = new HttpClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             string createTaskUrl = $"{baseUrl}/{ApiConstant.CreateTask}";
-            //中文
-            string pdfUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
             var pdfStream = File.Open(pdfUrl, FileMode.Open);
             var createTaskRequest = new
             {
@@ -197,7 +198,7 @@ namespace WordDemo
                 JObject getTaskResult = JObject.Parse(getTaskResultJson);
                 pdfJson = getTaskResult["task_result"].ToString();
                 string jsonFileName = Path.GetFileName(pdfUrl).Split('.').FirstOrDefault() + "_" + DateTime.Now.ToString("yyyyMMddHHmmss");
-                string jsonUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}_{createTaskRequest.physical_lines_precise}.json");
+                string jsonUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}.json");
                 File.WriteAllText(jsonUrl, pdfJson);
                 "json文件获取完毕".Console(ConsoleColor.Yellow);
 

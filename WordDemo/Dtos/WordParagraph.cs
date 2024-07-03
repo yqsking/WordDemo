@@ -1,5 +1,4 @@
-﻿
-using Microsoft.Office.Interop.Word;
+﻿using Microsoft.Office.Interop.Word;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +14,11 @@ namespace WordDemo.Models
         /// 页码数
         /// </summary>
         public int PageNumber { get; set; }
+
+        /// <summary>
+        /// 未排除转义符空格的段落文本
+        /// </summary>
+        public string OldText { get; set; }
 
         /// <summary>
         /// 段落文本
@@ -44,6 +48,16 @@ namespace WordDemo.Models
                 return  Text.Split('\t').Select(s => s.RemoveSpaceAndEscapeCharacter()).Where(w => !string.IsNullOrWhiteSpace(w)).ToList();
             }
         }
+
+        /// <summary>
+        /// 是否使用过
+        /// </summary>
+        public bool IsUsed { get; set; } = false;
+
+        /// <summary>
+        /// 是否空段落
+        /// </summary>
+        public bool IsEmptyParagraph => string.IsNullOrWhiteSpace(Text);
 
     }
 }
