@@ -12,8 +12,13 @@ namespace WordDemo.Helpers
         public static List<KeyValuePair<string,string>> GetCellReplaceItemConfig()
         {
             return new List<KeyValuePair<string, string>> {
-               new KeyValuePair<string, string>("年末数","年初数"),
                new KeyValuePair<string, string>("本年累计数","上年累计数"),
+               new KeyValuePair<string, string>("本年年末数","上年年末数"),
+               new KeyValuePair<string, string>("本年期末数","上年期末数"),
+               new KeyValuePair<string, string>("本期期末数","上期期末数"),
+               new KeyValuePair<string, string>("本期年末数","上期年末数"),
+               new KeyValuePair<string, string>("年末数","年初数"),
+               new KeyValuePair<string, string>("期末数","期初数"),
                new KeyValuePair<string, string>("本年","上年")
             };
         }

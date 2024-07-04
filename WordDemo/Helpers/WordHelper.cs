@@ -26,7 +26,7 @@ namespace WordDemo
         public static List<WordTable> GetWordTableList(string ocrJson, Document doc)
         {
             var tableList = new List<WordTable>();
-            var normalTableList=new List<WordTable>();
+            var normalTableList = new List<WordTable>();
             var paragraphList = new List<WordParagraph>();
             var wordLineList = new List<WordLine>();
             var wordCharList = new List<WordChar>();
@@ -69,7 +69,7 @@ namespace WordDemo
             wordLineList = GetWordPhysicalLineList(wordCharList, WordTableConfigHelper.GetOffsetValueByFontHeight());
 
             var tableJtokens = docJtoken["tables"].Children();
-            foreach (var tableJtoken in tableJtokens/*.Skip(6)*/)
+            foreach (var tableJtoken in tableJtokens)
             {
                 var table = new WordTable();
                 try
@@ -191,7 +191,7 @@ namespace WordDemo
                             {
                                 PageNumber = wdActiveEndPageNumber,
                                 ParagraphNumber = paragraphList.Count + 1,
-                                OldText=row.RowContent,
+                                OldText = row.RowContent,
                                 Text = row.RowContent.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
                                 Range = row.Range,
                                 IsUsed = true
@@ -231,7 +231,7 @@ namespace WordDemo
             $"开始匹配OCR表格内容起始段落和单元格Range".Console(ConsoleColor.Yellow);
             #region
             watch.Restart();
-            foreach (var table in tableList/*.Skip(6)*/)
+            foreach (var table in tableList)
             {
                 var tableFirstThreeLineTexts = table.FirstThreeLineTexts.Select(s => s.Replace("-", "").RemoveSpaceAndEscapeCharacter()).ToList();
                 var tableLastThreeLineTexts = table.LastThreeLineTexts.Select(s => s.Replace("-", "").RemoveSpaceAndEscapeCharacter()).ToList();
@@ -241,12 +241,12 @@ namespace WordDemo
                 foreach (var paragraph in rangeParagraphList)
                 {
                     //当前段落后三条段落（包含当前段落）
-                    var paragraphDownFirstThreelines = paragraphList.Where(w =>!w.IsEmptyParagraph&& w.ParagraphNumber >= paragraph.ParagraphNumber)
+                    var paragraphDownFirstThreelines = paragraphList.Where(w => !w.IsEmptyParagraph && w.ParagraphNumber >= paragraph.ParagraphNumber)
                         .OrderBy(o => o.ParagraphNumber).Take(3).ToList();
                     var downFirstThreeLineTexts = paragraphDownFirstThreelines.Select(s => s.Text.Replace("-", "")).ToList();
 
                     //当前段落前三条段落(包含当前段落)
-                    var paragraphUpFirstThreeLines = paragraphList.Where(w =>!w.IsEmptyParagraph&& w.ParagraphNumber <= paragraph.ParagraphNumber)
+                    var paragraphUpFirstThreeLines = paragraphList.Where(w => !w.IsEmptyParagraph && w.ParagraphNumber <= paragraph.ParagraphNumber)
                         .OrderByDescending(o => o.ParagraphNumber).Take(3).OrderBy(o => o.ParagraphNumber).ToList();
                     var upFirstThreeLineTexts = paragraphUpFirstThreeLines.Select(s => s.Text.Replace("-", "")).ToList();
 
@@ -279,9 +279,9 @@ namespace WordDemo
                         SupplementCell(table, topFiveParagraphs);
 
                         table.IsMatchWordParagraph = true;
-                        var tableRangeParagraphList= rangeParagraphList.Where(w => w.ParagraphNumber >= table.TableContentStartParagraphNumber &&
+                        var tableRangeParagraphList = rangeParagraphList.Where(w => w.ParagraphNumber >= table.TableContentStartParagraphNumber &&
                             w.ParagraphNumber <= table.TableContentEndParagraphNumber).ToList();
-                        foreach(var tableRangeParagraph in tableRangeParagraphList )
+                        foreach (var tableRangeParagraph in tableRangeParagraphList)
                         {
                             tableRangeParagraph.IsUsed = true;
                         }
@@ -322,7 +322,7 @@ namespace WordDemo
             #endregion
             int matchSuccessCount = tableList.Count(w => w.TableContentStartParagraphNumber > 0 && w.TableContentEndParagraphNumber > 0);
             $"匹配OCR表格起始段落和单元格Range结束，耗时{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
-            $"总共{tableList.Count}个表格，匹配成功{matchSuccessCount}个;有{tableList.Count(w=>w.IsTabStopTable)}个制表位表格,{normalTableList.Count}个正常表格".Console(ConsoleColor.Yellow);
+            $"总共{tableList.Count}个表格，匹配成功{matchSuccessCount}个;有{tableList.Count(w => w.IsTabStopTable)}个制表位表格,{normalTableList.Count}个正常表格".Console(ConsoleColor.Yellow);
 
             $"开始生成单元格新值。。。".Console(ConsoleColor.Yellow);
             #region 
@@ -331,10 +331,10 @@ namespace WordDemo
             BuildTabStopTableCellNewValue(tableList);
 
             //生成正常表格单元格新值
-            if(normalTableList.Any())
+            if (normalTableList.Any())
             {
                 BuildNormalTableCellNewValue(normalTableList);
-                foreach(var normalTable in normalTableList)
+                foreach (var normalTable in normalTableList)
                 {
                     normalTable.TableNumber = tableList.Count + 1;
                     tableList.Add(normalTable);
@@ -400,7 +400,7 @@ namespace WordDemo
                     }
                 }
 
-               
+
                 var tableRow = new WordTableRow()
                 {
                     RowNumber = rowIndex,
@@ -413,7 +413,7 @@ namespace WordDemo
                     tableRow.Range = wordRow.Range;
                 }
                 catch { }
-               
+
                 table.Rows.Add(tableRow);
                 rowIndex++;
             }
@@ -430,13 +430,13 @@ namespace WordDemo
 
                 }
 
-                if(row.Range==null)
+                if (row.Range == null)
                 {
                     var rowCellList = row.RowCells.Where(w => w.Range != null).OrderBy(o => o.StartColumnIndex).ToList();
-                    var firstCellRange= rowCellList.FirstOrDefault().Range.Duplicate;
+                    var firstCellRange = rowCellList.FirstOrDefault().Range.Duplicate;
                     firstCellRange.End = rowCellList.LastOrDefault().Range.End;
                     string text = firstCellRange.Text;
-                    row.Range= firstCellRange;
+                    row.Range = firstCellRange;
 
                 }
             }
@@ -514,7 +514,7 @@ namespace WordDemo
                 var table = tables[tableIndex];
                 try
                 {
-                  
+
                     //同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
                     var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(table.HeadRows);
                     var needReplaceHorizontalHeadCellList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)).ToList();
@@ -544,7 +544,7 @@ namespace WordDemo
                     {
                         var nextTable = tables[tableIndex + 1];
                         //两个表格所在页码数最多差一页
-                        if (Math.Abs(table.PageNumber-nextTable.PageNumber)<=1)
+                        if (Math.Abs(table.PageNumber - nextTable.PageNumber) <= 1)
                         {
                             //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
                             //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
@@ -971,11 +971,39 @@ namespace WordDemo
                 foreach (var replaceCell in replaceCells)
                 {
                     var replaceItem = replaceItemList.FirstOrDefault(w => w.Key == replaceCell.ReplaceMatchItem || w.Value == replaceCell.ReplaceMatchItem);
-                    var keyReplaceCell = replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Key);
-                    var valueReplaceCell = replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Value);
+
+                    /*
+                     * lxz 2024-07-03 修改逻辑
+                     * 根据当前单元个判断是key 还是 val 
+                     * 在根据当前单元格名称，替换key val值，的得到对应的单元格，排除使用过的列号
+                     * 判断keycell和valcell 是否获取到，
+                     * 记录使用过的列号
+                     */
+
+                    ReplaceCell keyReplaceCell = null;
+                    ReplaceCell valueReplaceCell = null;
+                    var alreadylist = alreadyReplaceMatchItemList.SelectMany(x => x.Split('_')).ToList();
+                    if (replaceCell.ReplaceMatchItem == replaceItem.Key)
+                    {
+                        keyReplaceCell = replaceCell;
+                        var val_Item = keyReplaceCell.CellValue.Replace(replaceItem.Key, replaceItem.Value);
+                        valueReplaceCell = replaceCells.Where(x => !alreadylist.Contains(x.Index.ToString())).FirstOrDefault(w => w.CellValue == val_Item);
+                    }
+                    else if (replaceCell.ReplaceMatchItem == replaceItem.Value)
+                    {
+                        valueReplaceCell = replaceCell;
+                        var key_Item = valueReplaceCell.CellValue.Replace(replaceItem.Value, replaceItem.Key);
+                        keyReplaceCell = replaceCells.Where(x => !alreadylist.Contains(x.Index.ToString())).FirstOrDefault(w => w.CellValue == key_Item);
+                    }
+
+                    //var keyReplaceCell = replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Key);
+                    //var valueReplaceCell = replaceCells.FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Value);
                     if (keyReplaceCell != null && valueReplaceCell != null)
                     {
-                        if (!alreadyReplaceMatchItemList.Contains(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem))
+                        //lxz 2024-07-03 判断【key的列号_val的列号】 
+                        //if (!alreadyReplaceMatchItemList.Contains(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem))
+
+                        if (!alreadyReplaceMatchItemList.Contains(keyReplaceCell.Index + "_" + valueReplaceCell.Index))
                         {
                             var matchKeyColumnCellList = allCellList.Where(w => w.StartColumnIndex == keyReplaceCell.Index && !w.IsHeadColumn).ToList();
                             var matchValueColumnCellList = allCellList.Where(w => w.StartColumnIndex == valueReplaceCell.Index && !w.IsHeadColumn).ToList();
@@ -991,7 +1019,8 @@ namespace WordDemo
                                 cell.IsReplaceValue = true;
                             }
 
-                            alreadyReplaceMatchItemList.Add(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem);
+                            //alreadyReplaceMatchItemList.Add(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem);
+                            alreadyReplaceMatchItemList.Add($"{keyReplaceCell.Index}_{valueReplaceCell.Index}");
                         }
 
                     }
@@ -1813,6 +1842,10 @@ namespace WordDemo
                 {
                     if (!table.IsMatchWordParagraph || table.Rows.Any(w => !w.IsMatchRowRange))
                     {
+                        errorMsg = $"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能匹配到Word段落范围";
+                        table.OperationType = OperationTypeEnum.ChangeColor;
+                        table.ErrorMsgs.Add(errorMsg);
+                        errorMsg.Console(ConsoleColor.Red);
                         continue;
                     }
                     if (!table.HeadRows.Any())
@@ -1876,7 +1909,6 @@ namespace WordDemo
                         }
 
                     }
-
                     //lxz 2024-07-01 添加逻辑
                     //表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
                     if (table.OperationType == OperationTypeEnum.NotOperation
