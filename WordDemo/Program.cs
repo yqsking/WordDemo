@@ -42,12 +42,19 @@ namespace WordDemo
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
 
             //常规表格
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.pdf");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.pdf");
+
+            //temp
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).pdf");
+
+            string jsonOutputUrl= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
             string pdfJson = File.ReadAllText(jsonPath);
-            //string pdfJson = GetPdfJson(pdfPath).GetAwaiter().GetResult();
+            //string pdfJson = GetPdfJson(pdfPath,jsonOutputUrl).GetAwaiter().GetResult();
             //return wordTables;
             Application wordApp = new Application();
             Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
@@ -71,7 +78,7 @@ namespace WordDemo
 
         }
 
-        private static async Task<string> GetPdfJson(string pdfUrl)
+        private static async Task<string> GetPdfJson(string pdfUrl,string jsonOutputUrl=null)
         {
             "开始获取pdf json数据".Console(ConsoleColor.Yellow);
             var watch = new Stopwatch();
@@ -197,9 +204,13 @@ namespace WordDemo
                 string getTaskResultJson = await httpResponse.Content.ReadAsStringAsync();
                 JObject getTaskResult = JObject.Parse(getTaskResultJson);
                 pdfJson = getTaskResult["task_result"].ToString();
-                string jsonFileName = Path.GetFileName(pdfUrl).Split('.').FirstOrDefault() + "_" + DateTime.Now.ToString("yyyyMMddHHmmss");
-                string jsonUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}.json");
-                File.WriteAllText(jsonUrl, pdfJson);
+                string jsonFileName = Path.GetFileName(pdfUrl).Split('.').FirstOrDefault();
+                if(string.IsNullOrWhiteSpace(jsonOutputUrl))
+                {
+                    jsonOutputUrl= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}.json");
+                }
+                   
+                File.WriteAllText(jsonOutputUrl, pdfJson);
                 "json文件获取完毕".Console(ConsoleColor.Yellow);
 
             }
