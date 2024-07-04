@@ -58,10 +58,15 @@ namespace WordDemo
         /// </summary>
         public List<WordParagraph> ContentParagraphs { get; set; }= new List<WordParagraph>();
 
+        ///// <summary>
+        ///// 是否制表位表格
+        ///// </summary>
+        //public bool IsTabStopTable => ContentParagraphs.Any() && !ContentParagraphs.All(w => w.Range.Text.Contains("\r\a"));
+
         /// <summary>
         /// 是否制表位表格
         /// </summary>
-        public bool IsTabStopTable => ContentParagraphs.Any()&&!ContentParagraphs.All(w => w.Range.Text.Contains("\r\a"));
+        public bool IsTabStopTable => ContentParagraphs.Any() && !ContentParagraphs.All(w => w.OldText.Contains("\r\a"));
 
         /// <summary>
         /// 表格在word的段落 过滤纯下划线段落

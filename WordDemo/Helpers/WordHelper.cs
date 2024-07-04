@@ -191,7 +191,7 @@ namespace WordDemo
                             {
                                 PageNumber = wdActiveEndPageNumber,
                                 ParagraphNumber = paragraphList.Count + 1,
-                                OldText = row.RowContent,
+                                OldText = row.Range.Text,
                                 Text = row.RowContent.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
                                 Range = row.Range,
                                 IsUsed = true
@@ -211,11 +211,13 @@ namespace WordDemo
                 }
                 else
                 {
+                    string paragraphText = while_paragraph.Range.Text;
                     var wordParagraph = new WordParagraph()
                     {
                         PageNumber = wdActiveEndPageNumber,
                         ParagraphNumber = paragraphList.Count + 1,
-                        Text = while_paragraph.Range.Text.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
+                        OldText = paragraphText,
+                        Text = paragraphText.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
                         Range = while_paragraph.Range,
                     };
                     paragraphList.Add(wordParagraph);
@@ -328,6 +330,8 @@ namespace WordDemo
             #region 
             watch.Restart();
             //生成制表位单元格新值
+            //排除掉所有ocr识别的正常表格
+            tableList = tableList.Where(w => w.IsTabStopTable).ToList();
             BuildTabStopTableCellNewValue(tableList);
 
             //生成正常表格单元格新值
@@ -442,8 +446,30 @@ namespace WordDemo
             }
             //第一个单元格垂直合并数量
             int firstCellRowSpan = table.Rows.FirstOrDefault().RowCells.FirstOrDefault().RowSpan;
+            //lxz 判断是否有【人民币元】和空行，
             foreach (var row in table.Rows)
             {
+                #region lxz 添加判断 人名币 和 空行 认为是表头
+                ////判断当前表格中是否有人民币行，如果并且大于firstCellRowSpan则firstCellRowSpan设置为当前行数
+                //var rmbCount = row.RowCells.Where(x => x.OldValue.Equals("人民币") || x.OldValue.Equals("人民币元")).Count();
+                //if (rmbCount > 1)
+                //{
+                //    if (row.RowNumber > firstCellRowSpan)
+                //    {
+                //        firstCellRowSpan = row.RowNumber;
+                //    }
+                //    //判断人民币下一行是否空行
+                //    if (row.RowNumber + 1 < table.Rows.Count)
+                //    {
+                //        var isNotEmpty = table.Rows[row.RowNumber + 1].RowCells.Where(x => !string.IsNullOrEmpty(x.OldValue)).Any();
+                //        if (!isNotEmpty)
+                //        {
+                //            firstCellRowSpan = row.RowNumber + 1;
+                //        }
+                //    }
+                //}
+                #endregion
+
                 if (row.RowNumber <= firstCellRowSpan)
                 {
                     foreach (var cell in row.RowCells)
@@ -454,6 +480,8 @@ namespace WordDemo
                 //排除掉被垂直合并的单元格
                 row.RowCells = row.RowCells.Where(w => w.VMergeVal != "").ToList();
             }
+            //lxz 添加判断 人名币 和 空行 认为是表头
+            SupplementRMBHeader(table);
             return table;
         }
 
@@ -1009,11 +1037,22 @@ namespace WordDemo
                             var matchValueColumnCellList = allCellList.Where(w => w.StartColumnIndex == valueReplaceCell.Index && !w.IsHeadColumn).ToList();
                             foreach (var cell in matchKeyColumnCellList)
                             {
+                                //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
+                                if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                {
+                                    continue;
+                                }
+
                                 cell.NewValue = "-";
                                 cell.IsReplaceValue = true;
                             }
                             foreach (var cell in matchValueColumnCellList)
                             {
+                                //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
+                                if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                {
+                                    continue;
+                                }
                                 var dataSourceCell = matchKeyColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex);
                                 cell.NewValue = dataSourceCell?.OldValue;
                                 cell.IsReplaceValue = true;
@@ -1693,20 +1732,23 @@ namespace WordDemo
                    @"^\([A-Z]+\)",//(a) （ii）
                 };
                 var headRowParagraphList = new List<WordParagraph>();
+
                 foreach (var paragraph in topFiveParagraphs)
                 {
                     Range paragraphRange = paragraph.Range;
-                    if (!paragraphRange.Text.Contains("\t"))
+                    var rangeText = paragraphRange.Text;
+
+                    if (!rangeText.Contains("\t"))
                     {
                         //段落不包含\t 
                         break;
                     }
-                    if (titlePatterns.Any(pattern => Regex.IsMatch(paragraphRange.Text, pattern)) && paragraphRange.Text.Count() < 50)
+                    if (titlePatterns.Any(pattern => Regex.IsMatch(rangeText, pattern)) && rangeText.Count() < 50)
                     {
                         //段落是标题
                         break;
                     }
-                    if (Regex.IsMatch(paragraphRange.Text, @"[0-9]{3},"))
+                    if (Regex.IsMatch(rangeText, @"[0-9]{3},"))
                     {
                         //表头不包含三位数，
                         break;
@@ -1759,7 +1801,78 @@ namespace WordDemo
                 }
             }
 
+            //lxz 2024-07-03 判断表格是否有人民币元行，和人民币行下一行是否空行；如果是则添加到表头
+            SupplementRMBHeader(table);
         }
+
+        /// <summary>
+        /// 判断表格是否有人民币元行，和人民币行下一行是否空行；如果是则添加到表头
+        /// </summary>
+        /// <param name="table"></param>
+        private static void SupplementRMBHeader(WordTable table)
+        {
+            //lxz判断表头是否有人民币
+            if (table.HeadRows.Any())
+            {
+                var lastrow = table.HeadRows.LastOrDefault();
+                var lastRowNumber = lastrow.RowNumber;
+                var maxRowNumber = table.Rows.Max(x => x.RowNumber);
+
+                if (lastRowNumber + 1 <= maxRowNumber && lastrow.RowCells.Where(x => x.OldValue.Equals("人民币") || x.OldValue.Equals("人民币元")).Count() < 1)
+                {
+                    var row = table.Rows.Where(x => x.RowNumber == lastRowNumber + 1).FirstOrDefault();
+                    if (row != null && row.RowCells.Where(x => x.OldValue.Equals("人民币") || x.OldValue.Equals("人民币元")).Count() > 1)
+                    {
+                        row.RowCells.ForEach(c => { c.IsHeadColumn = true; });
+                        lastrow = row;
+                        lastRowNumber = lastRowNumber + 1;
+                    }
+                }
+                //判断最后一行下一行，是否为空行；
+                if (lastRowNumber + 1 <= maxRowNumber)
+                {
+                    var _row = table.Rows.Where(x => x.RowNumber == lastRowNumber + 1).FirstOrDefault();
+                    if (_row != null && Regex.IsMatch(Regex.Replace(_row.RowContent, @"\s", ""), @"\s"))
+                    {
+                        _row.RowCells.ForEach(c => { c.IsHeadColumn = true; });
+                        lastrow = _row;
+                        lastRowNumber = lastRowNumber + 1;
+                    }
+                }
+            }
+            else
+            {
+                var rowCount = table.Rows.Count;
+                var headMaxNumber = 0;
+                var row = table.Rows.Where(r => r.RowCells.Where(x => x.OldValue.Equals("人民币") || x.OldValue.Equals("人民币元")).Count() > 1).FirstOrDefault();
+                if (row != null)
+                {
+                    headMaxNumber = row.RowNumber;
+                    var nextRow = table.Rows.Where(x => x.RowNumber == headMaxNumber + 1).FirstOrDefault();
+                    if (nextRow != null && Regex.IsMatch(Regex.Replace(nextRow.RowContent, @"\s", ""), @"\s"))
+                    {
+                        headMaxNumber = nextRow.RowNumber;
+                    }
+                }
+                if (headMaxNumber > 0)
+                {
+                    foreach (var item in table.Rows)
+                    {
+                        if (item.RowNumber <= headMaxNumber)
+                        {
+                            item.RowCells.ForEach(c => { c.IsHeadColumn = true; });
+                            //table.HeadRows.Add(item);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+            }
+        }
+
 
         /// <summary>
         /// 匹配制表位表格单元格Range

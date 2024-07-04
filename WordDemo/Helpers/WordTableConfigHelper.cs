@@ -19,7 +19,10 @@ namespace WordDemo.Helpers
                new KeyValuePair<string, string>("本期年末数","上期年末数"),
                new KeyValuePair<string, string>("年末数","年初数"),
                new KeyValuePair<string, string>("期末数","期初数"),
-               new KeyValuePair<string, string>("本年","上年")
+               new KeyValuePair<string, string>("本年","上年"),
+               new KeyValuePair<string, string>("年末余额","年初余额"),
+               new KeyValuePair<string, string>("本年金额","上年金额"),
+               new KeyValuePair<string, string>("年末余额","年初余额"),
             };
         }
 
