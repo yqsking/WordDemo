@@ -58,11 +58,6 @@ namespace WordDemo
         /// </summary>
         public List<WordParagraph> ContentParagraphs { get; set; }= new List<WordParagraph>();
 
-        ///// <summary>
-        ///// 是否制表位表格
-        ///// </summary>
-        //public bool IsTabStopTable => ContentParagraphs.Any() && !ContentParagraphs.All(w => w.Range.Text.Contains("\r\a"));
-
         /// <summary>
         /// 是否制表位表格
         /// </summary>

@@ -1005,22 +1005,21 @@ namespace WordDemo
                     {
                         if (cell.IsHeadColumn)
                         {
-                            var newValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
-                            if (cell.OldValue == newValue)
+                            string cellDateString= cell.OldValue.GetDateString();
+                            if(!string.IsNullOrWhiteSpace(cellDateString))
                             {
-                                continue;
+                                cell.NewValue= GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
+                                cell.IsReplaceValue = true;
                             }
-                            cell.NewValue = newValue;
                         }
                         else
                         {
-                            if (cell.OldValue == "")
+                            if (!string.IsNullOrWhiteSpace(cell.OldValue))
                             {
-                                continue;
+                                cell.NewValue = "";
+                                cell.IsReplaceValue = true;
                             }
-                            cell.NewValue = "";
                         }
-                        cell.IsReplaceValue = true;
                     }
                     //其他列依次从左取前一列
                     for (int i = 1; i < replaceCellGroupResultList.Count; i++)
@@ -1033,13 +1032,25 @@ namespace WordDemo
                         var currentMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceHeadCell.Index).ToList();
                         foreach (var cell in currentMatchItemColumnCellList)
                         {
-                            var newValue = prevMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                            if (cell.OldValue == newValue)
+                            if(cell.IsHeadColumn)
                             {
-                                continue;
+                                string cellDateString = cell.OldValue.GetDateString();
+                                if (!string.IsNullOrWhiteSpace(cellDateString))
+                                {
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
+                                    cell.IsReplaceValue = true;
+                                }
                             }
-                            cell.NewValue = newValue;
-                            cell.IsReplaceValue = true;
+                            else
+                            {
+                                var newValue = prevMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
+                                if(cell.OldValue!=newValue)
+                                {
+                                    cell.NewValue = newValue;
+                                    cell.IsReplaceValue = true;
+                                }
+                            }
+                          
                         };
                     }
 
@@ -1162,9 +1173,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    //第一列日期加一年
-                                    var cellNewDate = currentReplaceCell.ReplaceMatchItemDate.Value.AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(currentReplaceCell.ReplaceMatchItem, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
                                 }
                                 else
                                 {
@@ -1176,8 +1185,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    var cellNewDate = currentReplaceCell.ReplaceMatchItemDate.Value.AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(currentReplaceCell.ReplaceMatchItem, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
                                 }
                                 else
                                 {
@@ -1194,12 +1202,10 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    //第一列日期加一年
-                                    var cellNewDate = currentReplaceCell.ReplaceMatchItemDate.Value.AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(currentReplaceCell.ReplaceMatchItem, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
                                 }
-                                else
-                                {
+                                else 
+                                { 
                                     cell.NewValue = "";
                                 }
                                 cell.IsReplaceValue = true;
@@ -1208,8 +1214,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    var cellNewDate = currentReplaceCell.ReplaceMatchItemDate.Value.AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(currentReplaceCell.ReplaceMatchItem, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
                                 }
                                 else
                                 {
@@ -1242,7 +1247,7 @@ namespace WordDemo
                         var firstMatchItemRowCellList = allCellList.Where(w => w.StartRowIndex == replaceCellGroupResultList.FirstOrDefault().Index).ToList();
                         foreach (var cell in firstMatchItemRowCellList)
                         {
-                            if (cell.StartColumnIndex == 1)
+                            if (cell.StartColumnIndex <= 1)
                             {
                                 cell.NewValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
                             }
@@ -1253,7 +1258,7 @@ namespace WordDemo
                             cell.IsReplaceValue = true;
                         };
 
-                        //其他列依次从左往右平移
+                        //其他行 依次从上一个匹配项取值
                         for (int i = 1; i < replaceCellGroupResultList.Count; i++)
                         {
                             var currentReplaceHeadCell = replaceCellGroupResultList[i];
@@ -1264,7 +1269,15 @@ namespace WordDemo
                             var currentMatchItemRowCellList = allCellList.Where(w => w.StartRowIndex == currentReplaceHeadCell.Index).ToList();
                             foreach (var cell in currentMatchItemRowCellList)
                             {
-                                cell.NewValue = prevMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+                                if(cell.StartColumnIndex<=1)
+                                {
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
+                                }
+                                else
+                                {
+                                    cell.NewValue = prevMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+
+                                }
                                 cell.IsReplaceValue = true;
                             };
                         }
@@ -1427,8 +1440,7 @@ namespace WordDemo
                                 string cellDateString = cell.OldValue.GetDateString();
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
-                                    var cellNewDate = Convert.ToDateTime(cellDateString).AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(cellDateString, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
                                     cell.IsReplaceValue = true;
                                 }
                             }
@@ -1444,12 +1456,12 @@ namespace WordDemo
                                 //清空从第二列开始数据
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    if (cell.OldValue == "")
+                                    if (!string.IsNullOrWhiteSpace(cell.OldValue))
                                     {
-                                        continue;
+                                        cell.NewValue = "";
+                                        cell.IsReplaceValue = true;
                                     }
-                                    cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    
                                 }
                             }
                         }
@@ -1465,8 +1477,7 @@ namespace WordDemo
                                 string cellDateString = cell.OldValue.GetDateString();
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
-                                    var cellNewDate = Convert.ToDateTime(cellDateString).AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(cellDateString, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
                                     cell.IsReplaceValue = true;
                                 }
                             }
@@ -1485,8 +1496,13 @@ namespace WordDemo
                                     var dataRowCellList = tableDateRowCellList.Where(w => w.StartRowIndex == mapDataRowIndex).ToList();
                                     foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                     {
-                                        cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                        cell.IsReplaceValue = true;
+                                        var newCellValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+                                        if(cell.OldValue!=newCellValue)
+                                        {
+                                            cell.NewValue = newCellValue;
+                                            cell.IsReplaceValue = true;
+                                        }
+                                    
                                     }
                                 }
                             }
@@ -1509,8 +1525,7 @@ namespace WordDemo
                                 string cellDateString = cell.OldValue.GetDateString();
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
-                                    var cellNewDate = Convert.ToDateTime(cellDateString).AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(cellDateString, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
                                     cell.IsReplaceValue = true;
                                 }
                             }
@@ -1525,8 +1540,12 @@ namespace WordDemo
                                 //清空从第二列开始数据
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    if(!string.IsNullOrWhiteSpace(cell.OldValue))
+                                    {
+                                        cell.NewValue = "";
+                                        cell.IsReplaceValue = true;
+                                    }
+                                  
                                 }
                             }
                         }
@@ -1542,8 +1561,7 @@ namespace WordDemo
                                 string cellDateString = cell.OldValue.GetDateString();
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
-                                    var cellNewDate = Convert.ToDateTime(cellDateString).AddYears(1);
-                                    cell.NewValue = cell.OldValue.Replace(cellDateString, $"{cellNewDate.Year}年{cellNewDate.Month}月{cellNewDate.Day}日");
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
                                     cell.IsReplaceValue = true;
                                 }
                             }
@@ -1561,8 +1579,13 @@ namespace WordDemo
                                     var dataRowCellList = nextTableDateRowCellList.Where(w => w.StartRowIndex == mapDataRowIndex).ToList();
                                     foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                     {
-                                        cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                        cell.IsReplaceValue = true;
+                                        var newCellValue= dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+                                        if(cell.OldValue!=newCellValue)
+                                        {
+                                             cell.NewValue = newCellValue;
+                                             cell.IsReplaceValue = true;
+                                        }
+                                       
                                     }
                                 }
 

@@ -31,6 +31,16 @@ namespace WordDemo.Models
         }
 
         /// <summary>
+        /// 替换后新行文本
+        /// </summary>
+        public string NewRowContent
+        {
+            get {
+                return string.Join("", RowCells.Select(s => s.NewValue));
+            }
+        }
+
+        /// <summary>
         /// 行在word文档中的范围
         /// </summary>
         public Range Range { get; set; }
