@@ -988,9 +988,9 @@ namespace WordDemo
             if (dateReplaceMatchItems.Any() && dateReplaceMatchItems.Count >= 2)
             {
                 //如果匹配到的是日期 要替换的表头移除掉匹配项文本 得到的表头单元格值应该是一致的
-                dateReplaceMatchItems.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
+                //dateReplaceMatchItems.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
                 //根据表头新单元格值分组
-                var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue).ToList();
+                var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue.Replace(g.ReplaceMatchItem,"")).ToList();
                 foreach (var headCellValueGroupbyResult in headCellValueGroupbyResultList)
                 {
                     if (headCellValueGroupbyResult.Count() <= 1)
@@ -1173,7 +1173,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
                                 }
                                 else
                                 {
@@ -1185,7 +1185,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
                                 }
                                 else
                                 {
@@ -1202,7 +1202,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
                                 }
                                 else 
                                 { 
@@ -1214,7 +1214,7 @@ namespace WordDemo
                             {
                                 if (cell.StartColumnIndex <= 1)
                                 {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.NewValue);
+                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
                                 }
                                 else
                                 {
@@ -1232,9 +1232,9 @@ namespace WordDemo
                 {
                     //日期按顺序出现 如：2023年 2022年 2021年
                     //如果匹配到的是日期 要替换的表头移除掉匹配项文本 得到的表头单元格值应该是一致的
-                    dateReplaceMatchItems.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
+                    //dateReplaceMatchItems.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
                     //根据表头新单元格值分组
-                    var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue.RemoveWordTitle()).ToList();
+                    var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue.Replace(g.ReplaceMatchItem,"").RemoveWordTitle()).ToList();
                     foreach (var headCellValueGroupbyResult in headCellValueGroupbyResultList)
                     {
                         if (headCellValueGroupbyResult.Count() <= 1)
@@ -1699,7 +1699,7 @@ namespace WordDemo
         /// <returns></returns>
         private static string GetNextMaxDateHeadCellValue(List<ReplaceCell> replaceCells, string cellValue)
         {
-            var date = replaceCells.FirstOrDefault().ReplaceMatchItemDate.Value;
+            var date = Convert.ToDateTime(cellValue.GetDateString());
             DateTime? nextMaxDate = null;
             if (replaceCells.Any(w => w.ReplaceMatchItemDate.Value.Month == 6))
             {
