@@ -1229,7 +1229,7 @@ namespace WordDemo
                     //如果匹配到的是日期 要替换的表头移除掉匹配项文本 得到的表头单元格值应该是一致的
                     dateReplaceMatchItems.ForEach(f => f.CellValue = f.CellValue.Replace(f.ReplaceMatchItem, ""));
                     //根据表头新单元格值分组
-                    var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue).ToList();
+                    var headCellValueGroupbyResultList = dateReplaceMatchItems.GroupBy(g => g.CellValue.RemoveWordTitle()).ToList();
                     foreach (var headCellValueGroupbyResult in headCellValueGroupbyResultList)
                     {
                         if (headCellValueGroupbyResult.Count() <= 1)
@@ -1745,18 +1745,6 @@ namespace WordDemo
             {
                 //从下往上验证是否是表头段落
                 topFiveParagraphs.Reverse();
-                //标题类型：一、 1. （1） (1) (a)（a）（ii）（ii）
-                var titlePatterns = new string[] {
-                   @"^[零一二三四五六七八九十]+、", //一、
-                   @"^\d+\.",//1.
-                   @"^（\d+）",//（1）
-                   @"^\(\d+\)",//(1)
-                   @"^\d+\)",//1)
-                   @"^（[a-z]+）",//（a）
-                   @"^\([a-z]+\)",//(a)
-                   @"^（[A-Z]+）",//（a）（ii）
-                   @"^\([A-Z]+\)",//(a) （ii）
-                };
                 var headRowParagraphList = new List<WordParagraph>();
 
                 foreach (var paragraph in topFiveParagraphs)
@@ -1769,7 +1757,7 @@ namespace WordDemo
                         //段落不包含\t 
                         break;
                     }
-                    if (titlePatterns.Any(pattern => Regex.IsMatch(rangeText, pattern)) && rangeText.Count() < 50)
+                    if(!string.IsNullOrWhiteSpace(rangeText.MatchWordTitle())&&rangeText.Count()<50)
                     {
                         //段落是标题
                         break;

@@ -117,5 +117,48 @@ namespace System
             return Regex.Replace(Regex.Replace(str, datePattern, ""),yearPattern,"");
         }
 
+        /// <summary>
+        /// 匹配字符串中的word标题，如果不存在返回空字符串
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string MatchWordTitle(this string str)
+        {
+            string matchTitle = "";
+            //标题类型：一、 1. （1） (1) (a)（a）（ii）（ii）
+            var titlePatterns = new string[] {
+                   @"^[零一二三四五六七八九十]+、", //一、
+                   @"^\d+\.",//1.
+                   @"^（\d+）",//（1）
+                   @"^\(\d+\)",//(1)
+                   @"^\d+\)",//1)
+                   @"^（[a-z]+）",//（a）
+                   @"^\([a-z]+\)",//(a)
+                   @"^（[A-Z]+）",//（a）（ii）
+                   @"^\([A-Z]+\)",//(a) （ii）
+                };
+            foreach(var titlePattern in titlePatterns)
+            {
+                var matchResult= Regex.Match(str, titlePattern);
+                if(matchResult.Success)
+                {
+                    matchTitle = matchResult.Value;
+                    break;
+                }
+            }
+            return matchTitle;
+        }
+
+        /// <summary>
+        /// 移出字符串中的word标题
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string RemoveWordTitle(this string str)
+        {
+           string title= str.MatchWordTitle();
+            return string.IsNullOrWhiteSpace(title) ? str : str.Replace(title, "");
+        }
+
     }
 }
