@@ -53,14 +53,14 @@ namespace WordDemo
             string jsonOutputUrl= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
             string pdfJson = File.ReadAllText(jsonPath);
-            //string pdfJson = GetPdfJson(pdfPath,jsonOutputUrl).GetAwaiter().GetResult();
+            //string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
             //return wordTables;
             Application wordApp = new Application();
             Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
             doc.Activate();
             try
             {
-                wordTables = WordHelper.GetWordTableList(pdfJson, doc);
+                wordTables = WordHelper.GetWordTableList(pdfJson, doc).Tables;
 
             }
             catch (Exception ex)
