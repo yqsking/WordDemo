@@ -330,8 +330,6 @@ namespace WordDemo
             #region 
             watch.Restart();
             //生成制表位单元格新值
-            //排除掉所有ocr识别的正常表格
-            //tableList = tableList.Where(w => w.IsTabStopTable).ToList();
             BuildTabStopTableCellNewValue(tableList);
 
             //生成正常表格单元格新值
@@ -554,6 +552,17 @@ namespace WordDemo
 
                     var horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                     && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                    var filterHorizontalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                    foreach (var matchItem in horizontalKeywordReplaceMatchItemList)
+                    {
+                        var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
+                        bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => horizontalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                        if (isIncludeKeyvaluePair)
+                        {
+                            filterHorizontalKeywordReplaceMatchItemList.Add(matchItem);
+                        }
+                    }
+                    horizontalKeywordReplaceMatchItemList = filterHorizontalKeywordReplaceMatchItemList;
                     var horizontalKeywordReplaceMatchItemGroupCount = horizontalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
                     if (horizontalDateReplaceMatchItemGroupCount >= 2 ||
@@ -575,6 +584,17 @@ namespace WordDemo
 
                     var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                     && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                    var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                    foreach (var matchItem in verticalKeywordReplaceMatchItemList)
+                    {
+                        var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
+                        bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                        if (isIncludeKeyvaluePair)
+                        {
+                            filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
+                        }
+                    }
+                    verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
                     var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
                     if (verticalDateReplaceMatchItemGroupCount >= 2 ||
@@ -1985,7 +2005,7 @@ namespace WordDemo
         {
             var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
             int lastTableIndex = tables.IndexOf(tables.LastOrDefault());
-            for (int tableIndex = 21; tableIndex < tables.Count; tableIndex++)
+            for (int tableIndex = 0; tableIndex < tables.Count; tableIndex++)
             {
                 string errorMsg = string.Empty;
                 var table = tables[tableIndex];
@@ -2020,6 +2040,18 @@ namespace WordDemo
 
                         var horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                         && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                        var filterHorizontalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                        foreach(var matchItem in horizontalKeywordReplaceMatchItemList)
+                        {
+                            var matchItemKeyvaluePair= replaceItemList.FirstOrDefault(w=>w.Key== matchItem.ReplaceMatchItem||w.Value==matchItem.ReplaceMatchItem);
+                            bool isIncludeKeyvaluePair= new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => horizontalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                            if(isIncludeKeyvaluePair)
+                            {
+                                filterHorizontalKeywordReplaceMatchItemList.Add(matchItem);
+                            }
+                        }
+                        horizontalKeywordReplaceMatchItemList = filterHorizontalKeywordReplaceMatchItemList;
+
                         var horizontalKeywordReplaceMatchItemGroupCount = horizontalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
                         if (horizontalDateReplaceMatchItemGroupCount >= 2 ||
@@ -2041,6 +2073,17 @@ namespace WordDemo
 
                         var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                         && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                        var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                        foreach(var matchItem in verticalKeywordReplaceMatchItemList)
+                        {
+                            var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
+                            bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                            if (isIncludeKeyvaluePair)
+                            {
+                                filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
+                            }
+                        }
+                        verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
                         var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
                         if (verticalDateReplaceMatchItemGroupCount >= 2 ||
