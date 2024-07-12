@@ -63,6 +63,7 @@
     <Compile Include="Constants\ApiConstant.cs" />
     <Compile Include="Enums\ReplaceMatchItemTypeEnum.cs" />
     <Compile Include="Enums\OperationTypeEnum.cs" />
+    <Compile Include="Enums\TableSourceTypeEnum.cs" />
     <Compile Include="Helpers\ConsoleHelper.cs" />
     <Compile Include="Helpers\WordTableConfigHelper.cs" />
     <Compile Include="Helpers\StringHelper.cs" />

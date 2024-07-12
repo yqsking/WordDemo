@@ -122,5 +122,11 @@ namespace WordDemo
         /// </summary>
         public List<string> ErrorMsgs { get; set; }= new List<string>();
 
+       
+        /// <summary>
+        /// 表格来源
+        /// </summary>
+        public TableSourceTypeEnum TableSourceType { get; set; } = TableSourceTypeEnum.OCR;
+
     }
 }
