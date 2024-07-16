@@ -7,7 +7,7 @@ namespace System
 {
     public static class StringHelper
     {
-     
+
         /// <summary>
         /// 转半角字符
         /// </summary>
@@ -15,7 +15,7 @@ namespace System
         /// <returns></returns>
         public static string ConvertCharToHalfWidth(this string str)
         {
-            var chatArry= str.ToCharArray();
+            var chatArry = str.ToCharArray();
             // 全角字符到半角字符的Unicode码偏移量
             int offset = 65248;
             StringBuilder stringBuilder = new StringBuilder(chatArry.Length);
@@ -44,7 +44,7 @@ namespace System
         /// <returns></returns>
         public static string RemoveSpaceAndEscapeCharacter(this string str)
         {
-            return str.Replace("\a", "").Replace("\t", "").Replace("\r", "").Replace("\f", "").Replace(" ","").Replace("\n","").Replace("_","").Replace(":unselected:", "").Replace(":selected:", "");
+            return str.Replace("\a", "").Replace("\t", "").Replace("\r", "").Replace("\f", "").Replace(" ", "").Replace("\n", "").Replace("_", "").Replace(":unselected:", "").Replace(":selected:", "");
         }
 
         /// <summary>
@@ -55,8 +55,9 @@ namespace System
         public static List<string> SplitByChar(this string str)
         {
             var strChars = str.ToList().Select(s => new {
-                Text = s.ToString(), 
-                IsNumber = Regex.IsMatch(s.ToString(), @"^-?\d+(\.\d+)?$") })
+                Text = s.ToString(),
+                IsNumber = Regex.IsMatch(s.ToString(), @"^-?\d+(\.\d+)?$")
+            })
               .ToList();
             var strList = new List<string>();
             var numberList = new List<string>();
@@ -89,17 +90,17 @@ namespace System
         /// <returns></returns>
         public static string GetDateString(this string str)
         {
-            var dateStringList=new List<string>();
+            var dateStringList = new List<string>();
             string datePattern = @"\d{4}年\d{1,2}月\d{1,2}日";
             string yearPattern = @"\d{4}年";
-            var matchResult=Regex.Match(str, datePattern);
-            if(matchResult.Success)
+            var matchResult = Regex.Match(str, datePattern);
+            if (matchResult.Success)
             {
                 return matchResult.Value;
             }
             else
             {
-                matchResult= Regex.Match(str, yearPattern);
+                matchResult = Regex.Match(str, yearPattern);
                 return matchResult.Value;
             }
         }
@@ -114,7 +115,7 @@ namespace System
         {
             string datePattern = @"\d{4}年\d{1,2}月\d{1,2}日";
             string yearPattern = @"\d{4}年";
-            return Regex.Replace(Regex.Replace(str, datePattern, ""),yearPattern,"");
+            return Regex.Replace(Regex.Replace(str, datePattern, ""), yearPattern, "");
         }
 
         /// <summary>
@@ -137,10 +138,10 @@ namespace System
                    @"^（[A-Z]+）",//（a）（ii）
                    @"^\([A-Z]+\)",//(a) （ii）
                 };
-            foreach(var titlePattern in titlePatterns)
+            foreach (var titlePattern in titlePatterns)
             {
-                var matchResult= Regex.Match(str, titlePattern);
-                if(matchResult.Success)
+                var matchResult = Regex.Match(str, titlePattern);
+                if (matchResult.Success)
                 {
                     matchTitle = matchResult.Value;
                     break;
@@ -156,9 +157,56 @@ namespace System
         /// <returns></returns>
         public static string RemoveWordTitle(this string str)
         {
-           string title= str.MatchWordTitle();
+            string title = str.MatchWordTitle();
             return string.IsNullOrWhiteSpace(title) ? str : str.Replace(title, "");
         }
 
+
+        /// <summary>
+        /// 莱文斯坦距离
+        /// </summary>
+        /// <param name="str1">文本一</param>
+        /// <param name="str2">文本二</param>
+        /// <returns></returns>
+        internal static double Levenshtein_Distance(string str1, string str2)
+        {
+            if (string.IsNullOrEmpty(str1) || string.IsNullOrEmpty(str2))
+            {
+                return 0d;
+            }
+            var distance = 0;
+            int m = str1.Length;
+            int n = str2.Length;
+            var maxLength = Math.Max(m, n);
+            int[,] lev = new int[m + 1, n + 1];
+            // 字符串str1从空串 变为 字符串str2 前j个字符 的莱文斯坦距离
+            for (int j = 0; j < n + 1; j++)
+            {
+                lev[0, j] = j;
+            }
+            // 字符串str1从前i个字符 变为 空串 的莱文斯坦距离
+            for (int i = 1; i < m + 1; i++)
+            {
+                lev[i, 0] = i;
+            }
+
+            for (int i = 1; i < m + 1; i++)
+            {
+                for (int j = 1; j < n + 1; j++)
+                {
+                    // 在 字符串A的前i个字符 与 字符串B的前j-1个字符 完全相同的基础上, 进行一次插入操作
+                    int countByInsert = lev[i, j - 1] + 1;
+                    // 在 字符串A的前i-1个字符 与 字符串B的前j个字符 完全相同的基础上, 进行一次删除操作
+                    int countByDel = lev[i - 1, j] + 1;
+                    // 在 字符串A的前i-1个字符 与 字符串B的前j-1个字符 完全相同的基础上, 进行一次替换操作
+                    int countByReplace = str1[i - 1] == str2[j - 1] ? lev[i - 1, j - 1] : lev[i - 1, j - 1] + 1;
+                    // 计算 字符串A的前i个字符 与 字符串B的前j个字符 的莱文斯坦距离
+                    lev[i, j] = Math.Min(Math.Min(countByInsert, countByDel), countByReplace);
+                }
+            }
+            distance = lev[m, n];
+            var similar = (maxLength - distance) / (maxLength * 1d);
+            return similar;//1m - Convert.ToDecimal(distance) / Convert.ToDecimal(maxLength);
+        }
     }
 }

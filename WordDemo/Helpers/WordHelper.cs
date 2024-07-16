@@ -16,6 +16,19 @@ namespace WordDemo
 {
     public class WordHelper
     {
+        public static List<WordTable> GetWordTableList(Document doc)
+        {
+            var wordTableList = new List<WordTable>();
+            foreach(Table table in doc.Tables)
+            {
+                var wordTable= GetWordTable(table);
+                //var allCellList = wordTable.Rows.SelectMany(s => s.RowCells).ToList();
+                //var firstCell=allCellList.FirstOrDefault();
+                //var lastCell = allCellList.LastOrDefault();
+                wordTableList.Add(wordTable);
+            }
+            return wordTableList;
+        }
 
         /// <summary>
         /// 获取word制表位表格列表
@@ -366,8 +379,7 @@ namespace WordDemo
 
             return tableList;
         }
-
-
+      
         #region 正常表格
 
         /// <summary>

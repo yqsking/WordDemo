@@ -10,6 +10,8 @@
         /// <summary>
         /// 关键字
         /// </summary>
-        Keyword=2
+        Keyword=2,
+
+        Disturb=3
     }
 }

@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Office.Interop.Word;
@@ -20,8 +19,8 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-            GetOcrTableCellReplaceRule();
-
+            //GetOcrTableCellReplaceRule();
+            FormattingWordTable();
         }
 
 
@@ -77,6 +76,31 @@ namespace WordDemo
             }
             return wordTables;
 
+        }
+
+        private static void FormattingWordTable()
+        {
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            var wordTables = new List<WordTable>();
+            Application wordApp = new Application();
+            Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
+            doc.Activate();
+            try
+            {
+                wordTables = WordHelper.GetWordTableList(doc);
+
+
+            }
+            catch (Exception ex)
+            {
+                $"解析制表位表格失败,{ex.Message}".Console(ConsoleColor.Red);
+            }
+            finally
+            {
+                doc.Save();
+                doc.Close();
+                wordApp.Quit();
+            }
         }
 
         private static async Task<string> GetPdfJson(string pdfUrl,string jsonOutputUrl=null)
