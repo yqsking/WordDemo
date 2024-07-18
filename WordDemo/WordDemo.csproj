@@ -61,9 +61,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Constants\ApiConstant.cs" />
+    <Compile Include="Dtos\FormattingWordTableConfig.cs" />
+    <Compile Include="Enums\HorizontalPositionTypeEnum.cs" />
     <Compile Include="Enums\ReplaceMatchItemTypeEnum.cs" />
     <Compile Include="Enums\OperationTypeEnum.cs" />
     <Compile Include="Enums\TableSourceTypeEnum.cs" />
+    <Compile Include="Enums\VerticalPositionTypeEnum.cs" />
     <Compile Include="Helpers\ConsoleHelper.cs" />
     <Compile Include="Helpers\WordTableConfigHelper.cs" />
     <Compile Include="Helpers\StringHelper.cs" />
@@ -114,6 +117,21 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Files\Roll-例（广州-修改后）.docx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Files\实线格式-1003914-0046-00-00-B1A-德师报%28审%29字%2824%29第P02306号.docx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Files\实线格式-1003914-0046-00-00-B1A-德师报%28审%29字%2824%29第P02306号.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Files\实线格式-1003914-0046-00-00-B1A-德师报%28审%29字%2824%29第P02306号.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Files\实线格式-CV028-0023-00-00-B01-德师报%28审%29字%2824%29第P02741号.docx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Files\实线格式-CV028-0023-00-00-B01-德师报%28审%29字%2824%29第P02741号.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Files\招商蛇口格式_1229.docx">

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using WordDemo.Dtos;
 using WordDemo.Enums;
 using WordDemo.Helpers;
 using WordDemo.Models;
@@ -16,18 +17,71 @@ namespace WordDemo
 {
     public class WordHelper
     {
-        public static List<WordTable> GetWordTableList(Document doc)
+        /// <summary>
+        /// 格式化表格表头和添加下划线
+        /// </summary>
+        /// <param name="doc"></param>
+        /// <param name="config"></param>
+        /// <returns></returns>
+        public static void FormattingWordTableHeaderAndAppendUnderline(Document doc, FormattingWordTableConfig config)
         {
             var wordTableList = new List<WordTable>();
-            foreach(Table table in doc.Tables)
+            int tableNumber = 0;
+            try
             {
-                var wordTable= GetWordTable(table);
-                //var allCellList = wordTable.Rows.SelectMany(s => s.RowCells).ToList();
-                //var firstCell=allCellList.FirstOrDefault();
-                //var lastCell = allCellList.LastOrDefault();
-                wordTableList.Add(wordTable);
+                foreach (Table table in doc.Tables)
+                {
+                    tableNumber++;
+                    Cell firstCell = table.Cell(1, 1);
+                    Cell lastCell= table.Range.Cells[table.Range.Cells.Count];
+                    $"第{tableNumber}个表格第1个单元格值：{firstCell.Range.Text.RemoveSpaceAndEscapeCharacter()},最后一个单元格值：{lastCell.Range.Text.RemoveSpaceAndEscapeCharacter()}".Console();
+
+                    var wordTable= GetWordTable(table);
+                    int headRowStartIndex = wordTable.HeadRows.Min(m => m.RowNumber);
+                    int headRowEndIndex = wordTable.HeadRows.Max(m => m.RowNumber);
+
+                    var firstCellBorderList = new List<Border> {
+                       firstCell.Range.Borders[WdBorderType.wdBorderTop],
+                       firstCell.Range.Borders[WdBorderType.wdBorderLeft],
+                       firstCell.Range.Borders[WdBorderType.wdBorderRight]
+                    };
+                    var lastCellBorderList = new List<Border> {
+                        lastCell.Range.Borders[WdBorderType.wdBorderTop],
+                        lastCell.Range.Borders[WdBorderType.wdBorderLeft],
+                        lastCell.Range.Borders[WdBorderType.wdBorderRight]
+                    };
+                    var solidLineBorderList = new WdLineStyle[] {
+                      WdLineStyle.wdLineStyleSingle,//单实线
+                      WdLineStyle.wdLineStyleDouble,//双实线
+                      WdLineStyle.wdLineStyleTriple,//三条细实线
+                      WdLineStyle.wdLineStyleThinThickSmallGap,WdLineStyle.wdLineStyleThickThinSmallGap,
+                      WdLineStyle.wdLineStyleThinThickThinSmallGap,WdLineStyle.wdLineStyleThinThickMedGap,
+                      WdLineStyle.wdLineStyleThickThinMedGap,WdLineStyle.wdLineStyleThinThickThinMedGap,
+                      WdLineStyle.wdLineStyleThinThickLargeGap,WdLineStyle.wdLineStyleThickThinLargeGap,
+                      WdLineStyle.wdLineStyleThinThickThinLargeGap,
+                      WdLineStyle.wdLineStyleSingleWavy,//波浪单实线
+                      WdLineStyle.wdLineStyleDoubleWavy,//波浪双实线
+                    };
+
+                    //如果第一个单元格和最后一个单元格任意一个的上左右边框线都是实线 代表表格是实线
+                    if(firstCellBorderList.All(w=>solidLineBorderList.Contains(w.LineStyle))||
+                       lastCellBorderList.All(w=>solidLineBorderList.Contains(w.LineStyle)))
+                    {
+                        
+                    }
+                    else
+                    {
+                        //按照虚线表格处理
+                    }
+                }
+
             }
-            return wordTableList;
+            catch (Exception ex)
+            {
+                $"格式化异常,{ex.Message}".Console(ConsoleColor.Red);
+            }
+           
+            //cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphCenter;
         }
 
         /// <summary>
@@ -174,22 +228,12 @@ namespace WordDemo
             Paragraph while_paragraph = doc.Paragraphs.First;
             while (while_paragraph != null)
             {
-                //if (string.IsNullOrWhiteSpace(while_paragraph.Range.Text.RemoveSpaceAndEscapeCharacter()))
-                //{
-                //    //跳过空段落
-                //    while_paragraph = while_paragraph.Next();
-                //    continue;
-                //}
                 int wdActiveEndPageNumber = Convert.ToInt32(while_paragraph.Range.Information[WdInformation.wdActiveEndPageNumber]);
                 if (while_paragraph.Range.Tables.Count > 0)
                 {
                     //如果段落中有表格 则表格的非空行算一个段落
                     Table paragraphTable = while_paragraph.Range.Tables[1];
                     var firstAndLastRowContent = GetTableFirstAndLastContent(paragraphTable);
-                    //var firstAndLastRowText = $"{firstAndLastRowContent.FirstRowContent}{firstAndLastRowContent.LastRowContent}";
-                    //var preTableFirstAndLastRowText = $"{prevTableFirstRowContent}{prevTableLastRowContent}";
-                    //if (firstAndLastRowText != preTableFirstAndLastRowText)
-                    //{
                     var normalTable = GetWordTable(paragraphTable);
                     int tableContentStartParagraphNumber = paragraphList.Count() + 1;
                     foreach (var row in normalTable.Rows)
@@ -393,7 +437,6 @@ namespace WordDemo
             string tableXml = wordTable.Range.WordOpenXML;
             XDocument document = XDocument.Parse(tableXml);
             var rows = document.Root.Descendants().Where(f => f.Name.LocalName == "tr").ToList();
-            int rowIndex = 1;
             foreach (var row in rows)
             {
                 var rowCells = new List<WordTableCell>();
@@ -411,7 +454,7 @@ namespace WordDemo
                     var tableCell = new WordTableCell()
                     {
                         OldValue = cell.Value,
-                        StartRowIndex = rowIndex,
+                        StartRowIndex = table.Rows.Count+1,
                         ActualStartColumnIndex = cells.IndexOf(cell) + 1,
                         StartColumnIndex = columnIndex,
                         ColSpan = gridSpanVal,
@@ -428,22 +471,24 @@ namespace WordDemo
                     }
                 }
 
-
+                //如果整行内容都是空 不计入行
+                if(rowCells.Select(s=>s.OldValue.Trim()).All(w=>string.IsNullOrWhiteSpace(w)))
+                {
+                    continue;
+                }
                 var tableRow = new WordTableRow()
                 {
-                    RowNumber = rowIndex,
+                    RowNumber = table.Rows.Count+1,
                     RowCells = rowCells,
-
                 };
                 try
                 {
-                    Row wordRow = wordTable.Rows[rowIndex];
+                    Row wordRow = wordTable.Rows[table.Rows.Count + 1];
                     tableRow.Range = wordRow.Range;
                 }
                 catch { }
 
                 table.Rows.Add(tableRow);
-                rowIndex++;
             }
 
             foreach (var row in table.Rows)
@@ -453,7 +498,15 @@ namespace WordDemo
                     cell.RowSpan = GetVerticalMergeCount(cell, table.Rows);
                     if (cell.VMergeVal != "")
                     {
-                        cell.Range = wordTable.Cell(cell.StartRowIndex, cell.ActualStartColumnIndex).Range;
+                        try
+                        {
+                            cell.Range = wordTable.Cell(cell.StartRowIndex, cell.ActualStartColumnIndex).Range;
+                        }
+                        catch(Exception ex)
+                        {
+                            $"第{row.RowNumber}行第{cell.ActualStartColumnIndex}列获取Range失败".Console(ConsoleColor.Red);
+                        }
+                       
                     }
 
                 }
@@ -461,10 +514,14 @@ namespace WordDemo
                 if (row.Range == null)
                 {
                     var rowCellList = row.RowCells.Where(w => w.Range != null).OrderBy(o => o.StartColumnIndex).ToList();
-                    var firstCellRange = rowCellList.FirstOrDefault().Range.Duplicate;
-                    firstCellRange.End = rowCellList.LastOrDefault().Range.End;
-                    string text = firstCellRange.Text;
-                    row.Range = firstCellRange;
+                    if(rowCellList.Any())
+                    {
+                        var firstCellRange = rowCellList.FirstOrDefault().Range.Duplicate;
+                        firstCellRange.End = rowCellList.LastOrDefault().Range.End;
+                        string text = firstCellRange.Text;
+                        row.Range = firstCellRange;
+
+                    }
 
                 }
             }

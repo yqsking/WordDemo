@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using Microsoft.Office.Interop.Word;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using WordDemo.Dtos;
+using WordDemo.Enums;
 
 namespace WordDemo
 {
@@ -19,8 +21,14 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-            //GetOcrTableCellReplaceRule();
-            FormattingWordTable();
+            GetOcrTableCellReplaceRule();
+            //FormattingWord(new FormattingWordTableConfig
+            //{
+            //    SolidLineBorderTableHorizontalPositionType = HorizontalPositionTypeEnum.Center,
+            //    SolidLineBorderTableVerticalPositionTypeEnum = VerticalPositionTypeEnum.Center,
+            //    OtherHorizontalPositionType = HorizontalPositionTypeEnum.Center,
+            //    OtherVerticalPositionTypeEnum = VerticalPositionTypeEnum.Top
+            //});
         }
 
 
@@ -46,12 +54,16 @@ namespace WordDemo
             //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.json");
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.pdf");
 
-            //temp
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.pdf");
 
-            string jsonOutputUrl= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
+            //temp
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).pdf");
+
+            string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
             string pdfJson = File.ReadAllText(jsonPath);
             //string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
@@ -78,32 +90,7 @@ namespace WordDemo
 
         }
 
-        private static void FormattingWordTable()
-        {
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
-            var wordTables = new List<WordTable>();
-            Application wordApp = new Application();
-            Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
-            doc.Activate();
-            try
-            {
-                wordTables = WordHelper.GetWordTableList(doc);
-
-
-            }
-            catch (Exception ex)
-            {
-                $"解析制表位表格失败,{ex.Message}".Console(ConsoleColor.Red);
-            }
-            finally
-            {
-                doc.Save();
-                doc.Close();
-                wordApp.Quit();
-            }
-        }
-
-        private static async Task<string> GetPdfJson(string pdfUrl,string jsonOutputUrl=null)
+        private static async Task<string> GetPdfJson(string pdfUrl, string jsonOutputUrl = null)
         {
             "开始获取pdf json数据".Console(ConsoleColor.Yellow);
             var watch = new Stopwatch();
@@ -230,11 +217,11 @@ namespace WordDemo
                 JObject getTaskResult = JObject.Parse(getTaskResultJson);
                 pdfJson = getTaskResult["task_result"].ToString();
                 string jsonFileName = Path.GetFileName(pdfUrl).Split('.').FirstOrDefault();
-                if(string.IsNullOrWhiteSpace(jsonOutputUrl))
+                if (string.IsNullOrWhiteSpace(jsonOutputUrl))
                 {
-                    jsonOutputUrl= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}.json");
+                    jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"Files/{jsonFileName}.json");
                 }
-                   
+
                 File.WriteAllText(jsonOutputUrl, pdfJson);
                 "json文件获取完毕".Console(ConsoleColor.Yellow);
 
@@ -244,6 +231,34 @@ namespace WordDemo
             watch.Stop();
             $"获取pdf json数据结束，耗时{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
             return pdfJson;
+        }
+
+        /// <summary>
+        /// 格式化
+        /// </summary>
+        /// <param name="config"></param>
+        private static void FormattingWord(FormattingWordTableConfig config)
+        {
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            var wordTables = new List<WordTable>();
+            Application wordApp = new Application();
+            Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
+            doc.Activate();
+            try
+            {
+                WordHelper.FormattingWordTableHeaderAndAppendUnderline(doc, config);
+
+            }
+            catch (Exception ex)
+            {
+                $"解析制表位表格失败,{ex.Message}".Console(ConsoleColor.Red);
+            }
+            finally
+            {
+                doc.Save();
+                doc.Close();
+                wordApp.Quit();
+            }
         }
     }
 }

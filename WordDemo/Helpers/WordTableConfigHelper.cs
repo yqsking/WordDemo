@@ -11,6 +11,7 @@ namespace WordDemo.Helpers
         /// <returns></returns>
         public static List<KeyValuePair<string, string>> GetCellReplaceItemConfig()
         {
+            //本年累计数 上年累计数 本年年末数 上年年末数
             return new List<KeyValuePair<string, string>> {
                    new KeyValuePair<string, string>("本年累计数","上年累计数"),
                    new KeyValuePair<string, string>("本年年末数","上年年末数"),
@@ -21,7 +22,6 @@ namespace WordDemo.Helpers
                    new KeyValuePair<string, string>("本年净发生额","上年净发生额"),
                    new KeyValuePair<string, string>("年末余额","年初余额"),
                    new KeyValuePair<string, string>("本年金额","上年金额"),
-                   new KeyValuePair<string, string>("年末余额","年初余额"),
                    new KeyValuePair<string, string>("期末余额","期初余额"),
                    new KeyValuePair<string, string>("年末数","年初数"),
                    new KeyValuePair<string, string>("期末数","期初数"),

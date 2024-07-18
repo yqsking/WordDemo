@@ -128,5 +128,10 @@ namespace WordDemo
         /// </summary>
         public TableSourceTypeEnum TableSourceType { get; set; } = TableSourceTypeEnum.OCR;
 
+        /// <summary>
+        /// 表格边框类型
+        /// </summary>
+        public bool IsSolidLineBorderTable { get; set; } 
+
     }
 }
