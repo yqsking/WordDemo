@@ -54,14 +54,14 @@ namespace WordDemo
             //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.json");
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.pdf");
 
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.pdf");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.pdf");
 
             //temp
-            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).docx");
-            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).json");
-            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/Roll-例（原稿） (1).pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.pdf");
 
             string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
