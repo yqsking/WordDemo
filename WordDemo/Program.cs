@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Office.Interop.Word;
@@ -14,6 +15,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WordDemo.Dtos;
 using WordDemo.Enums;
+using WordDemo.Helpers;
 
 namespace WordDemo
 {
@@ -22,6 +24,7 @@ namespace WordDemo
         static void Main(string[] args)
         {
             GetOcrTableCellReplaceRule();
+
             //FormattingWord(new FormattingWordTableConfig
             //{
             //    SolidLineBorderTableHorizontalPositionType = HorizontalPositionTypeEnum.Center,
@@ -59,9 +62,9 @@ namespace WordDemo
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.pdf");
 
             //temp
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.pdf");
 
             string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 

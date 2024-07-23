@@ -12,6 +12,9 @@
         /// </summary>
         Keyword=2,
 
+        /// <summary>
+        /// 干扰项(匹配到多个替换项的单元格值)
+        /// </summary>
         Disturb=3
     }
 }

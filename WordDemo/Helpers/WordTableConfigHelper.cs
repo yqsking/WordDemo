@@ -27,7 +27,8 @@ namespace WordDemo.Helpers
                    new KeyValuePair<string, string>("期末数","期初数"),
                    new KeyValuePair<string, string>("本年","上年"),
                    new KeyValuePair<string, string>("期末","期初"),
-                   new KeyValuePair<string, string>("本期","上期")
+                   new KeyValuePair<string, string>("本期","上期"),
+                   new KeyValuePair<string, string>("年末","年初")
             };
         }
 

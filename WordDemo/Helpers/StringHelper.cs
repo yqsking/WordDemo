@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using WordDemo.Helpers;
 
 namespace System
 {
@@ -103,6 +104,40 @@ namespace System
                 matchResult = Regex.Match(str, yearPattern);
                 return matchResult.Value;
             }
+
+        }
+
+        /// <summary>
+        /// 获取多个替换匹配项
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static List<string> GetAllReplaceItemList(this string str)
+        {
+            var matchReplaceItemList = new List<string>();
+            string datePattern = @"\d{4}年\d{1,2}月\d{1,2}日";
+            string yearPattern = @"\d{4}年";
+            string keyvaluePattern =string.Join("|" ,WordTableConfigHelper.GetCellReplaceItemConfig().SelectMany(s => new[] { s.Key, s.Value }).Distinct().ToList());
+            var dateMatchResults= Regex.Matches(str,datePattern);
+            foreach(Match dateMatchResult in dateMatchResults)
+            {
+                matchReplaceItemList.Add(dateMatchResult.Value);
+            }
+            if(dateMatchResults.Count<=0)
+            {
+                var yearMatchResults=Regex.Matches(str, yearPattern);
+                foreach(Match yearMatchResult in yearMatchResults)
+                {
+                    matchReplaceItemList.Add(yearMatchResult.Value);
+                }
+            }
+
+            var keyvalueMatchResults=Regex.Matches(str, keyvaluePattern);
+            foreach(Match keyvalueMatchResult in keyvalueMatchResults)
+            {
+                matchReplaceItemList.Add(keyvalueMatchResult.Value);
+            }
+            return matchReplaceItemList;
         }
 
         /// <summary>

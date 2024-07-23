@@ -21,5 +21,6 @@
         /// 不操作
         /// </summary>
         NotOperation = 3
+
     }
 }
