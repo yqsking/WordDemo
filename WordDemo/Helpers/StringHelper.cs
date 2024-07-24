@@ -196,14 +196,13 @@ namespace System
             return string.IsNullOrWhiteSpace(title) ? str : str.Replace(title, "");
         }
 
-
         /// <summary>
         /// 莱文斯坦距离
         /// </summary>
         /// <param name="str1">文本一</param>
         /// <param name="str2">文本二</param>
         /// <returns></returns>
-        internal static double Levenshtein_Distance(string str1, string str2)
+        public static double Levenshtein_Distance(string str1, string str2)
         {
             if (string.IsNullOrEmpty(str1) || string.IsNullOrEmpty(str2))
             {
@@ -243,5 +242,67 @@ namespace System
             var similar = (maxLength - distance) / (maxLength * 1d);
             return similar;//1m - Convert.ToDecimal(distance) / Convert.ToDecimal(maxLength);
         }
+
+        /// <summary>
+        /// 替换为空
+        /// </summary>
+        /// <param name="str1"></param>
+        /// <param name="str2"></param>
+        /// <returns></returns>
+        public static string ReplaceEmpty(this string str1,string str2)
+        {
+            return str1.Replace(str2, "");
+        }
+
+        /// <summary>
+        /// 是否包含
+        /// </summary>
+        /// <param name="str1"></param>
+        /// <param name="str2"></param>
+        /// <returns></returns>
+        public static bool IsContains(this string str1,string str2)
+        {
+            return str1.Length>str2.Length?Regex.IsMatch(str1,str2):Regex.IsMatch(str2,str1);
+        }
+
+        /// <summary>
+        /// 判断集合元素是否连续重复出现，如：年末数 年初数 年末数 年初数
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static bool HasRepeatedPair(this List<string> list)
+        {
+            if (list == null || list.Count < 4)
+                return false;
+
+            var pairCounts = new Dictionary<Tuple<string, string>, int>();
+
+            for (int i = 0; i < list.Count - 1; i++)
+            {
+                if (i > 0 && list[i] == list[i - 1] && list[i + 1] == list[i])
+                {
+                    // 忽略连续的相同元素对
+                    continue;
+                }
+
+                var pair = Tuple.Create(list[i], list[i + 1]);
+                if (pairCounts.ContainsKey(pair))
+                {
+                    pairCounts[pair]++;
+                    if (pairCounts[pair] >= 2)
+                    {
+                        // 如果元素对出现了两次或以上，返回true
+                        return true;
+                    }
+                }
+                else
+                {
+                    pairCounts.Add(pair, 1);
+                }
+            }
+
+            return false;
+        }
+
     }
 }

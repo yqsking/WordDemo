@@ -23,6 +23,7 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
+          
             GetOcrTableCellReplaceRule();
 
             //FormattingWord(new FormattingWordTableConfig
@@ -34,6 +35,7 @@ namespace WordDemo
             //});
         }
 
+      
 
         /// <summary>
         /// 获取制表位word表格替换规则

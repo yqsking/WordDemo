@@ -635,7 +635,7 @@ namespace WordDemo
                     var horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                     && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                     var filterHorizontalKeywordReplaceMatchItemList = new List<ReplaceCell>();
-                    foreach (var matchItem in horizontalKeywordReplaceMatchItemList)
+                    horizontalKeywordReplaceMatchItemList.ForEach(matchItem =>
                     {
                         var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
                         bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => horizontalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
@@ -643,7 +643,7 @@ namespace WordDemo
                         {
                             filterHorizontalKeywordReplaceMatchItemList.Add(matchItem);
                         }
-                    }
+                    });
                     horizontalKeywordReplaceMatchItemList = filterHorizontalKeywordReplaceMatchItemList;
                     var horizontalKeywordReplaceMatchItemGroupCount = horizontalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
@@ -667,7 +667,7 @@ namespace WordDemo
                     var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                     && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                     var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
-                    foreach (var matchItem in verticalKeywordReplaceMatchItemList)
+                    verticalKeywordReplaceMatchItemList.ForEach(matchItem =>
                     {
                         var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
                         bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
@@ -675,7 +675,7 @@ namespace WordDemo
                         {
                             filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
                         }
-                    }
+                    });
                     verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
                     var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
@@ -1325,9 +1325,10 @@ namespace WordDemo
             {
                 var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
                 var keywordReplaceMatchItemGroupList = keywordReplaceMatchItems.GroupBy(g => g.ReplaceMatchItem).ToList();
-                var groupKeywordCellValueCount = keywordReplaceMatchItems.GroupBy(g => g.CellValue).Count();
-                //lxz 2024-07-22 添加条件 groupKeywordCellValueCount<keywordReplaceMatchItems.Count; 则认为有重复的，才走该逻辑；
-                if (keywordReplaceMatchItems.Count % 2 == 0 && keywordReplaceMatchItemGroupList.All(w => w.Count() >= 2) && groupKeywordCellValueCount < keywordReplaceMatchItems.Count)
+                var replaceMatchItemList = keywordReplaceMatchItems.Select(s => s.ReplaceMatchItem).ToList();
+                var hasRepeatedPair= replaceMatchItemList.HasRepeatedPair();
+                if (keywordReplaceMatchItems.Count % 2 == 0&& keywordReplaceMatchItemGroupList.All(w => w.Count()>= 2)&&
+                    keywordReplaceMatchItemGroupList .Count==2&& hasRepeatedPair)
                 {
                     //关键字两两一组重复出现 如：年末数 年初数 年末数 年初数
                     //匹配项数量是偶数 且匹配项存在重复 按照最近的两个匹配项为一组 
@@ -1415,15 +1416,16 @@ namespace WordDemo
                         {
                             keyReplaceCell = replaceCell;
                             //var val_Item = keyReplaceCell.CellValue.Replace(replaceItem.Key, replaceItem.Value).Trim();
+                            //年末数金额 年初数金额(已重述)
                             valueReplaceCell = keywordReplaceMatchItems.Where(x => !alreadylist.Contains(x.Index.ToString()))
-                                .FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Value);
+                                .FirstOrDefault(w =>w.ReplaceMatchItem==replaceItem.Value&& w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(keyReplaceCell.CellValue.ReplaceEmpty(keyReplaceCell.ReplaceMatchItem)));
                         }
                         else if (replaceCell.ReplaceMatchItem == replaceItem.Value)
                         {
                             valueReplaceCell = replaceCell;
                             //var key_Item = valueReplaceCell.CellValue.Replace(replaceItem.Value, replaceItem.Key).Trim();
                             keyReplaceCell = keywordReplaceMatchItems.Where(x => !alreadylist.Contains(x.Index.ToString()))
-                                .FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Key);
+                                .FirstOrDefault(w =>w.ReplaceMatchItem==replaceItem.Key&& w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(valueReplaceCell.CellValue.ReplaceEmpty(valueReplaceCell.ReplaceMatchItem)));
                         }
 
                         if (keyReplaceCell != null && valueReplaceCell != null)
