@@ -61,7 +61,7 @@ namespace WordDemo
         /// <summary>
         /// 是否制表位表格
         /// </summary>
-        public bool IsTabStopTable => ContentParagraphs.Any() && !ContentParagraphs.All(w => w.OldText.Contains("\r\a"));
+        public bool IsTabStopTable => ContentParagraphs.Any() && !ContentParagraphs.Any(w => w.OldText.Contains("\r\a")); //!ContentParagraphs.All(w => w.OldText.Contains("\r\a"));
 
         /// <summary>
         /// 表格在word的段落 过滤纯下划线段落

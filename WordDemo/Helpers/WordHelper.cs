@@ -84,7 +84,6 @@ namespace WordDemo
             //cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphCenter;
         }
 
-
         /// <summary>
         /// 获取word制表位表格列表
         /// </summary>
@@ -222,10 +221,6 @@ namespace WordDemo
             "开始解析word段落".Console(ConsoleColor.Yellow);
             #region
             watch.Restart();
-            //上一个表格首行内容
-            string prevTableFirstRowContent = "";
-            //上一个表格尾行内容
-            string prevTableLastRowContent = "";
             Paragraph while_paragraph = doc.Paragraphs.First;
             while (while_paragraph != null)
             {
@@ -256,7 +251,7 @@ namespace WordDemo
                         {
                             PageNumber = wdActiveEndPageNumber,
                             ParagraphNumber = paragraphList.Count + 1,
-                            OldText = row.Range.Text,
+                            OldText = row.Range?.Text ?? "",
                             Text = row.RowContent.RemoveSpaceAndEscapeCharacter().ConvertCharToHalfWidth(),
                             Range = row.Range,
                             IsUsed = true
@@ -269,8 +264,6 @@ namespace WordDemo
                     normalTable.TableContentStartParagraphNumber = tableContentStartParagraphNumber;
                     normalTable.TableContentEndParagraphNumber = tableContentEndParagraphNumber;
                     normalTableList.Add(normalTable);
-                    prevTableFirstRowContent = firstAndLastRowContent.FirstRowContent;
-                    prevTableLastRowContent = firstAndLastRowContent.LastRowContent;
                     while_paragraph = paragraphTable.Range.Cells[paragraphTable.Range.Cells.Count].Range.Paragraphs.Last.Next();
                 }
                 else
@@ -440,7 +433,7 @@ namespace WordDemo
         /// </summary>
         /// <param name="wordTable"></param>
         /// <returns></returns>
-        private static WordTable GetWordTable(Table wordTable)
+        private static WordTable GetWordTable_old(Table wordTable)
         {
             var table = new WordTable();
             string tableXml = wordTable.Range.WordOpenXML;
@@ -484,11 +477,11 @@ namespace WordDemo
                         columnIndex++;
                     }
                 }
-                //如果整行内容都是空 不计入行
-                if (rowCells.Select(s => s.OldValue.Trim()).All(w => string.IsNullOrWhiteSpace(w)))
-                {
-                    continue;
-                }
+                ////如果整行内容都是空 不计入行
+                //if (rowCells.Select(s => s.OldValue.Trim()).All(w => string.IsNullOrWhiteSpace(w)))
+                //{
+                //    continue;
+                //}
                 var tableRow = new WordTableRow()
                 {
                     RowNumber = table.Rows.Count + 1,
@@ -562,6 +555,196 @@ namespace WordDemo
             }
             //lxz 添加判断 人名币 和 空行 认为是表头
             SupplementRMBHeader(table);
+            return table;
+        }
+
+        private static WordTable GetWordTable(Table wordTable)
+        {
+            var table = new WordTable();
+            try
+            {
+                string tableXml = wordTable.Range.WordOpenXML;
+                XDocument document = XDocument.Parse(tableXml);
+                var rows = document.Root.Descendants().Where(f => f.Name.LocalName == "tr").ToList();
+                //所有行都是空行的表格 返回空
+                if (rows.All(w => string.IsNullOrWhiteSpace(w.Value)))
+                {
+                    return null;
+                }
+                var temp_rowList = new List<WordTableRow>();
+                var rdx = 1;
+                foreach (var row in rows)
+                {
+                    var rowCells = new List<WordTableCell>();
+                    temp_rowList.Add(new WordTableRow
+                    {
+                        RowNumber = rdx,
+                        RowCells = rowCells,
+                    });
+                    var x_cells = row.Descendants().Where(w => w.Name.LocalName == "tc").ToList();
+                    int columnIndex = 1;
+                    foreach (var x_cell in x_cells)
+                    {
+                        var tcPr = x_cell.Descendants().FirstOrDefault(w => w.Name.LocalName == "tcPr");
+                        var gridSpan = tcPr.Descendants().FirstOrDefault(w => w.Name.LocalName == "gridSpan");
+                        var gridSpanVal = gridSpan == null ? 1 : Convert.ToInt32(gridSpan.Attributes().FirstOrDefault(w => w.Name.LocalName == "val").Value);
+
+                        var vMerge = tcPr.Descendants().FirstOrDefault(w => w.Name.LocalName == "vMerge");
+
+                        //var vMergeVal = vMerge == null ? null : vMerge.Attributes().FirstOrDefault(w => w.Name.LocalName == "val")?.Value ?? string.Empty;
+
+                        //1:Restart 2:Continue 3:NoMerge
+                        var vMergeVal = "NoMerge";
+                        if (vMerge != null)
+                        {
+                            vMergeVal = vMerge.Attributes().FirstOrDefault(w => w.Name.LocalName == "val")?.Value ?? "Continue";
+                        }
+                        var tableCell = new WordTableCell()
+                        {
+                            OldValue = x_cell.Value,
+                            StartRowIndex = rdx,
+                            ActualStartColumnIndex = x_cells.IndexOf(x_cell) + 1,
+                            StartColumnIndex = columnIndex,
+                            ColSpan = gridSpanVal,
+                            VMergeVal = vMergeVal
+                        };
+                        rowCells.Add(tableCell);
+                        if (tableCell.ColSpan > 1)
+                        {
+                            columnIndex += tableCell.ColSpan;
+                        }
+                        else
+                        {
+                            columnIndex++;
+                        }
+                    }
+                    rdx++;
+
+                }
+
+                //计算单元格合并行
+                var tblColCount = temp_rowList.Max(x => x.RowCells.Count);
+                var tblRowCount = temp_rowList.Count;
+                for (var colIdx = 0; colIdx < tblColCount; colIdx++)
+                {
+                    var colList = new List<WordTableCell>();
+                    for (int _rdx = 0; _rdx < tblRowCount; _rdx++)
+                    {
+                        var _cell = temp_rowList[_rdx].RowCells.Where(x => x.StartColumnIndex == colIdx + 1).FirstOrDefault();
+                        if (_cell != null)
+                        {
+                            colList.Add(_cell);
+                        }
+                    }
+
+                    //var fristRelativeRowIndex = -1;
+                    //var lastRelativeRowIndex = -1;
+                    //var rowSpan = -1;
+                    //进行行合并
+                    for (var rowIdx = 0; rowIdx < tblRowCount; rowIdx++)
+                    {
+                        var cell = temp_rowList[rowIdx].RowCells.Where(x => x.StartColumnIndex == colIdx + 1).FirstOrDefault();
+                        if (cell == null)
+                        {
+                            continue;
+                        }
+                        cell.RowSpan = 1;
+                        //1:Restart 2:Continue 3:NoMerge
+                        if (cell.VMergeVal.ToUpper() == "Restart".ToUpper())
+                        {
+                            var lastCell = colList.Where(x => x.StartRowIndex > cell.StartRowIndex && x.VMergeVal.ToUpper() != "Continue".ToUpper()).FirstOrDefault();
+                            //rowSpan = lastCell.StartRowIndex - cell.StartRowIndex;
+                            //fristRelativeRowIndex = cell.RowIndex;
+                            //lastRelativeRowIndex = lastCell.RowIndex - 1;
+
+                            //cell.StartRowIndex =  fristRelativeRowIndex;
+                            //cell.EndRowIndex = lastRelativeRowIndex;
+
+                            cell.RowSpan = lastCell.StartRowIndex - cell.StartRowIndex;// rowSpan;
+                        }
+                        else if (cell.VMergeVal.ToUpper() == "Continue".ToUpper())
+                        {
+                            cell.RowSpan = 1;//rowSpan
+                        }
+                        else if (cell.VMergeVal.ToUpper() == "NoMerge".ToUpper())
+                        {
+                            cell.RowSpan = 1;
+                            //rowSpan = -1;
+                        }
+                    }
+                }
+
+                var sindex = 0;
+                var removeRowIndexList = new List<int>();
+                for (int rowIndex = 0; rowIndex < tblRowCount; rowIndex++)
+                {
+                    var row = temp_rowList[rowIndex];
+                    var isRemoveRow = false;
+                    if (row.RowCells.Where(x => x.VMergeVal.ToUpper() == "Continue".ToUpper()).Count() == row.RowCells.Count())
+                    {
+                        //删除该行
+                        removeRowIndexList.Add(rowIndex);
+                        isRemoveRow = true;
+                        sindex++;
+                    }
+                    if (!isRemoveRow)
+                    {
+                        row.RowCells.ForEach(c =>
+                        {
+                            c.StartRowIndex -= sindex;
+                            if (!isRemoveRow)
+                            {
+                                if (c.VMergeVal.ToUpper() != "Continue".ToUpper())
+                                {
+                                    c.Range = wordTable.Cell(c.StartRowIndex, c.ActualStartColumnIndex)?.Range;
+                                }
+                            }
+                        });
+                        row.RowNumber -= sindex;
+                        if (!isRemoveRow && !row.RowCells.Where(x => x.ColSpan > 1 || x.RowSpan > 1).Any())
+                        {
+                            var rowCellList = row.RowCells.Where(w => w.Range != null).OrderBy(o => o.StartColumnIndex).ToList();
+                            var firstCellRange = rowCellList.FirstOrDefault().Range.Duplicate;
+                            firstCellRange.End = rowCellList.LastOrDefault().Range.End;
+                            row.Range = firstCellRange;
+                            row.IsMatchRowRange = row.Range != null;
+                        }
+                    }
+                }
+
+                if (removeRowIndexList.Any())
+                {
+                    var count = removeRowIndexList.Count - 1;
+                    for (int i = count; i >= 0; i--)
+                    {
+                        var idx = removeRowIndexList[i];
+                        temp_rowList.RemoveAt(idx);
+                    }
+                }
+                table.Rows = temp_rowList;
+                //第一个单元格垂直合并数量
+                int firstCellRowSpan = table.Rows.FirstOrDefault().RowCells.FirstOrDefault().RowSpan;
+                //lxz 判断是否有【人民币元】和空行，
+                foreach (var row in table.Rows)
+                {
+                    if (row.RowNumber <= firstCellRowSpan)
+                    {
+                        foreach (var cell in row.RowCells)
+                        {
+                            cell.IsHeadColumn = true;
+                        }
+                    }
+                    //排除掉被垂直合并的单元格
+                    row.RowCells = row.RowCells.Where(w => w.VMergeVal.ToUpper() != "Continue".ToUpper()).ToList();
+                }
+                //lxz 添加判断 人名币 和 空行 认为是表头
+                SupplementRMBHeader(table);
+            }
+            catch (Exception ex)
+            {
+                table = null;
+            }
+
             return table;
         }
 
@@ -659,33 +842,36 @@ namespace WordDemo
 
                     #region 同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
                     var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
-
-                    var verticalDateReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
-                    && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
-                    var verticalDateReplaceMatchItemGroupCount = verticalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
-
-                    var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
-                    && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
-                    var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
-                    verticalKeywordReplaceMatchItemList.ForEach(matchItem =>
+                    var isTheSameHeadRow = IsTheSameHeadRow(table, tables);
+                    if (!isTheSameHeadRow)
                     {
-                        var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
-                        bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
-                        if (isIncludeKeyvaluePair)
+                        var verticalDateReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                         && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
+                        var verticalDateReplaceMatchItemGroupCount = verticalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
+
+                        var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                        && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                        var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                        verticalKeywordReplaceMatchItemList.ForEach(matchItem =>
                         {
-                            filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
-                        }
-                    });
-                    verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
-                    var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
+                            var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
+                            bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                            if (isIncludeKeyvaluePair)
+                            {
+                                filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
+                            }
+                        });
+                        verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
+                        var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
-                    if (verticalDateReplaceMatchItemGroupCount >= 2 ||
-                       verticalKeywordReplaceMatchItemGroupCount >= 2)
-                    {
-                        //执行同表跨行替换逻辑
-                        SameTableCrossRowReplace(table, verticalDateReplaceMatchItemList, verticalKeywordReplaceMatchItemList);
-                        table.OperationType = OperationTypeEnum.ReplaceText;
-                        continue;
+                        if (verticalDateReplaceMatchItemGroupCount >= 2 ||
+                           verticalKeywordReplaceMatchItemGroupCount >= 2)
+                        {
+                            //执行同表跨行替换逻辑
+                            SameTableCrossRowReplace(table, verticalDateReplaceMatchItemList, verticalKeywordReplaceMatchItemList);
+                            table.OperationType = OperationTypeEnum.ReplaceText;
+                            continue;
+                        }
                     }
 
                     #endregion
@@ -693,13 +879,16 @@ namespace WordDemo
                     #region 跨表上下替换 只有当前表非最后一个表格且与下一个表格表头除了匹配项完全一致 
                     if (tableIndex < lastTableIndex)
                     {
+
                         var nextTable = tables[tableIndex + 1];
+
                         //两个表格所在页码数最多差一页
                         if (Math.Abs(table.PageNumber - nextTable.PageNumber) <= 1)
                         {
                             //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
                             //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
-                            var nextTableHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(nextTable.HeadRows);
+                            var nextTableHorizontalHeadRowCellList = nextTable != null ? GetHorizontalMergeTableHeadRow(nextTable.HeadRows) : new List<ReplaceCell>();
+
                             var nextTableHorizontalDateReplaceMatchItemList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                              && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
                             var nextTableHorizontalDateReplaceMatchItemGroupCount = nextTableHorizontalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
@@ -1326,9 +1515,9 @@ namespace WordDemo
                 var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
                 var keywordReplaceMatchItemGroupList = keywordReplaceMatchItems.GroupBy(g => g.ReplaceMatchItem).ToList();
                 var replaceMatchItemList = keywordReplaceMatchItems.Select(s => s.ReplaceMatchItem).ToList();
-                var hasRepeatedPair= replaceMatchItemList.HasRepeatedPair();
-                if (keywordReplaceMatchItems.Count % 2 == 0&& keywordReplaceMatchItemGroupList.All(w => w.Count()>= 2)&&
-                    keywordReplaceMatchItemGroupList .Count==2&& hasRepeatedPair)
+                var hasRepeatedPair = replaceMatchItemList.HasRepeatedPair();
+                if (keywordReplaceMatchItems.Count % 2 == 0 && keywordReplaceMatchItemGroupList.All(w => w.Count() >= 2) &&
+                    keywordReplaceMatchItemGroupList.Count == 2 && hasRepeatedPair)
                 {
                     //关键字两两一组重复出现 如：年末数 年初数 年末数 年初数
                     //匹配项数量是偶数 且匹配项存在重复 按照最近的两个匹配项为一组 
@@ -1418,14 +1607,14 @@ namespace WordDemo
                             //var val_Item = keyReplaceCell.CellValue.Replace(replaceItem.Key, replaceItem.Value).Trim();
                             //年末数金额 年初数金额(已重述)
                             valueReplaceCell = keywordReplaceMatchItems.Where(x => !alreadylist.Contains(x.Index.ToString()))
-                                .FirstOrDefault(w =>w.ReplaceMatchItem==replaceItem.Value&& w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(keyReplaceCell.CellValue.ReplaceEmpty(keyReplaceCell.ReplaceMatchItem)));
+                                .FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Value && w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(keyReplaceCell.CellValue.ReplaceEmpty(keyReplaceCell.ReplaceMatchItem)));
                         }
                         else if (replaceCell.ReplaceMatchItem == replaceItem.Value)
                         {
                             valueReplaceCell = replaceCell;
                             //var key_Item = valueReplaceCell.CellValue.Replace(replaceItem.Value, replaceItem.Key).Trim();
                             keyReplaceCell = keywordReplaceMatchItems.Where(x => !alreadylist.Contains(x.Index.ToString()))
-                                .FirstOrDefault(w =>w.ReplaceMatchItem==replaceItem.Key&& w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(valueReplaceCell.CellValue.ReplaceEmpty(valueReplaceCell.ReplaceMatchItem)));
+                                .FirstOrDefault(w => w.ReplaceMatchItem == replaceItem.Key && w.CellValue.ReplaceEmpty(w.ReplaceMatchItem).IsContains(valueReplaceCell.CellValue.ReplaceEmpty(valueReplaceCell.ReplaceMatchItem)));
                         }
 
                         if (keyReplaceCell != null && valueReplaceCell != null)
@@ -2330,8 +2519,6 @@ namespace WordDemo
             }
         }
 
-
-
         /// <summary>
         /// 生成制表位表格单元格新值
         /// </summary>
@@ -2406,38 +2593,41 @@ namespace WordDemo
                         }
                         #endregion
 
-                        #region 同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
+                        #region 同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字 且上下表
                         var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
-
-                        var verticalDateReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
-                        && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
-                        var verticalDateReplaceMatchItemGroupCount = verticalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
-
-                        var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
-                        && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
-                        var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
-                        verticalKeywordReplaceMatchItemList.ForEach(matchItem =>
+                        var isTheSameHeadRow = IsTheSameHeadRow(table, tables);
+                        if (!isTheSameHeadRow)
                         {
-                            var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
-                            bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
-                            if (isIncludeKeyvaluePair && matchItem.ReplaceMatchItemType != ReplaceMatchItemTypeEnum.Disturb)
+                            var verticalDateReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                            && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
+                            var verticalDateReplaceMatchItemGroupCount = verticalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
+
+                            var verticalKeywordReplaceMatchItemList = verticalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                            && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                            var filterVerticalKeywordReplaceMatchItemList = new List<ReplaceCell>();
+                            verticalKeywordReplaceMatchItemList.ForEach(matchItem =>
                             {
-                                filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
+                                var matchItemKeyvaluePair = replaceItemList.FirstOrDefault(w => w.Key == matchItem.ReplaceMatchItem || w.Value == matchItem.ReplaceMatchItem);
+                                bool isIncludeKeyvaluePair = new string[] { matchItemKeyvaluePair.Key, matchItemKeyvaluePair.Value }.All(w => verticalKeywordReplaceMatchItemList.Select(s => s.ReplaceMatchItem).Contains(w));
+                                if (isIncludeKeyvaluePair && matchItem.ReplaceMatchItemType != ReplaceMatchItemTypeEnum.Disturb)
+                                {
+                                    filterVerticalKeywordReplaceMatchItemList.Add(matchItem);
+                                }
+                            });
+                            verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
+                            var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
+
+                            if (verticalDateReplaceMatchItemGroupCount >= 2 ||
+                               verticalKeywordReplaceMatchItemGroupCount >= 2)
+                            {
+                                //执行同表跨行替换逻辑
+                                SameTableCrossRowReplace(table, verticalDateReplaceMatchItemList, verticalKeywordReplaceMatchItemList);
+                                table.OperationType = OperationTypeEnum.ReplaceText;
+
+                                //lxz 2024-07-22 添加逻辑
+                                ReSetTableOperationType(table, horizontalHeadRowCellList, verticalHeadRowCellList);
+                                continue;
                             }
-                        });
-                        verticalKeywordReplaceMatchItemList = filterVerticalKeywordReplaceMatchItemList;
-                        var verticalKeywordReplaceMatchItemGroupCount = verticalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
-
-                        if (verticalDateReplaceMatchItemGroupCount >= 2 ||
-                           verticalKeywordReplaceMatchItemGroupCount >= 2)
-                        {
-                            //执行同表跨行替换逻辑
-                            SameTableCrossRowReplace(table, verticalDateReplaceMatchItemList, verticalKeywordReplaceMatchItemList);
-                            table.OperationType = OperationTypeEnum.ReplaceText;
-
-                            //lxz 2024-07-22 添加逻辑
-                            ReSetTableOperationType(table, horizontalHeadRowCellList, verticalHeadRowCellList);
-                            continue;
                         }
 
                         #endregion
@@ -2446,12 +2636,14 @@ namespace WordDemo
                         if (tableIndex < lastTableIndex)
                         {
                             var nextTable = tables[tableIndex + 1];
+
                             //判断下一个表是否符合替换条件 
                             if (nextTable.IsMatchWordParagraph && nextTable.Rows.All(w => w.IsMatchRowRange))
                             {
                                 //判断当前表格与下一个表格是否表头除开日期部分是否完全一致 上下两个表格均有一个匹配项
                                 //且当前表格第一列所有行中内容是否存在任意一项在下一个表格第一列所有行中存在
-                                var nextTableHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(nextTable.HeadRows);
+                                var nextTableHorizontalHeadRowCellList = nextTable != null ? GetHorizontalMergeTableHeadRow(nextTable.HeadRows) : new List<ReplaceCell>();
+
                                 var nextTableHorizontalDateReplaceMatchItemList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                                  && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
                                 var nextTableHorizontalDateReplaceMatchItemGroupCount = nextTableHorizontalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
@@ -2526,6 +2718,37 @@ namespace WordDemo
                 table.OperationType = OperationTypeEnum.ChangeColor;
             }
         }
+        #endregion
+
+        #region Common
+
+        /// <summary>
+        /// 判断当前表格与前一个和下一个是否相同表头行
+        /// </summary>
+        /// <param name="currentTable"></param>
+        /// <param name="tables"></param>
+        /// <returns></returns>
+        private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables)
+        {
+            var currentTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(currentTable.HeadRows)).ReplaceDate();
+            var prevTableNumber = currentTable.TableNumber - 1;
+            var prevTable = tables.FirstOrDefault(w => w.TableNumber == prevTableNumber);
+            var prevTableHeadRowContent = string.Empty;
+            if (prevTable != null)
+            {
+                prevTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(prevTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
+            }
+            var nextTableNumber = currentTable.TableNumber + 1;
+            var nextTable = tables.FirstOrDefault(w => w.TableNumber == nextTableNumber);
+            string nextTableHeadRowContent = string.Empty;
+            if (nextTable != null)
+            {
+                nextTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(nextTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
+            }
+            bool isTheSameHeadRow = currentTableHeadRowContent == prevTableHeadRowContent || currentTableHeadRowContent == nextTableHeadRowContent;
+            return isTheSameHeadRow;
+        }
+
         #endregion
 
         #region 识别段落中的制表位表格
@@ -2960,7 +3183,6 @@ namespace WordDemo
         /// 合并表格
         /// </summary>
         /// <param name="tables"></param>
-
         private static void MergeTables(List<WordTable> tables)
         {
             /*
