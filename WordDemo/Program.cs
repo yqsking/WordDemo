@@ -23,7 +23,7 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-          
+           
             GetOcrTableCellReplaceRule();
 
             //FormattingWord(new FormattingWordTableConfig
@@ -45,14 +45,14 @@ namespace WordDemo
         {
             var wordTables = new List<WordTable>();
             ////制表位日期
-            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
-            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
-            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
 
             //制表位关键字
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.pdf");
 
             //常规表格
             //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");

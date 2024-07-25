@@ -304,5 +304,17 @@ namespace System
             return false;
         }
 
+        /// <summary>
+        /// 是否word表格数据行（不包含日期，包含任意三位数, 或者任意数字）
+        /// </summary>
+        /// <param name="rowContent"></param>
+        /// <returns></returns>
+        public static bool IsWordTableDateRow(this string rowContent)
+        {
+            bool isContainDate = Regex.IsMatch(rowContent, "(\\d{4}年)|(\\d{1,2})(月|日)");
+            bool isContainMoney = Regex.IsMatch(rowContent, "(\\d{3},)|(\\d+)");
+            return !isContainDate && isContainMoney;
+        }
+
     }
 }

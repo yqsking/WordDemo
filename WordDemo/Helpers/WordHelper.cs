@@ -340,6 +340,8 @@ namespace WordDemo
                         table.IsMatchWordParagraph = true;
                         var tableRangeParagraphList = rangeParagraphList.Where(w => w.ParagraphNumber >= table.TableContentStartParagraphNumber &&
                             w.ParagraphNumber <= table.TableContentEndParagraphNumber).ToList();
+
+
                         foreach (var tableRangeParagraph in tableRangeParagraphList)
                         {
                             tableRangeParagraph.IsUsed = true;
@@ -399,7 +401,7 @@ namespace WordDemo
                 }
             }
 
-
+            SplitTables(tableList);
             //生成制表位单元格新值
             BuildTabStopTableCellNewValue(tableList);
 
@@ -407,6 +409,7 @@ namespace WordDemo
             if (normalTableList.Any())
             {
                 MergeTables(normalTableList);
+                SplitTables(normalTableList);
                 BuildNormalTableCellNewValue(normalTableList);
                 foreach (var normalTable in normalTableList)
                 {
@@ -435,6 +438,7 @@ namespace WordDemo
         /// <returns></returns>
         private static WordTable GetWordTable_old(Table wordTable)
         {
+
             var table = new WordTable();
             string tableXml = wordTable.Range.WordOpenXML;
             XDocument document = XDocument.Parse(tableXml);
@@ -556,13 +560,18 @@ namespace WordDemo
             //lxz 添加判断 人名币 和 空行 认为是表头
             SupplementRMBHeader(table);
             return table;
+
         }
 
         private static WordTable GetWordTable(Table wordTable)
         {
-            var table = new WordTable();
+            int wdActiveEndPageNumber = -1;
             try
             {
+                var _paragraph = wordTable.Range.Paragraphs.First;
+                wdActiveEndPageNumber = Convert.ToInt32(_paragraph.Range.Information[WdInformation.wdActiveEndPageNumber]);
+
+                var table = new WordTable();
                 string tableXml = wordTable.Range.WordOpenXML;
                 XDocument document = XDocument.Parse(tableXml);
                 var rows = document.Root.Descendants().Where(f => f.Name.LocalName == "tr").ToList();
@@ -571,6 +580,7 @@ namespace WordDemo
                 {
                     return null;
                 }
+
                 var temp_rowList = new List<WordTableRow>();
                 var rdx = 1;
                 foreach (var row in rows)
@@ -739,13 +749,18 @@ namespace WordDemo
                 }
                 //lxz 添加判断 人名币 和 空行 认为是表头
                 SupplementRMBHeader(table);
+
+                return table;
             }
             catch (Exception ex)
             {
-                table = null;
+                var msg = "解析表格失败";
+                if (wdActiveEndPageNumber > 0)
+                {
+                    msg += $",第{wdActiveEndPageNumber}页";
+                }
+                throw new Exception($"{msg};ex:{ex.Message}", ex);
             }
-
-            return table;
         }
 
         /// <summary>
@@ -836,6 +851,9 @@ namespace WordDemo
                         //执行同表跨列替换逻辑
                         SameTableCrossColumnReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList);
                         table.OperationType = OperationTypeEnum.ReplaceText;
+
+                        //lxz 2024-07-24 添加逻辑
+                        ReSetTableOperationType(table, horizontalHeadRowCellList, null);
                         continue;
                     }
                     #endregion
@@ -870,6 +888,9 @@ namespace WordDemo
                             //执行同表跨行替换逻辑
                             SameTableCrossRowReplace(table, verticalDateReplaceMatchItemList, verticalKeywordReplaceMatchItemList);
                             table.OperationType = OperationTypeEnum.ReplaceText;
+
+                            //lxz 2024-07-24 添加逻辑
+                            ReSetTableOperationType(table, horizontalHeadRowCellList, verticalHeadRowCellList);
                             continue;
                         }
                     }
@@ -926,19 +947,22 @@ namespace WordDemo
                     #endregion
 
                     //lxz 2024-07-01 添加逻辑
-                    //表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
-                    if (table.OperationType == OperationTypeEnum.NotOperation && (
-                          horizontalHeadRowCellList.Any(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem))
-                          || verticalHeadRowCellList.Any(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem))
-                          || horizontalHeadRowCellList.Any(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Disturb)
-                          ))
-                    {
-                        table.OperationType = OperationTypeEnum.ChangeColor;
-                    }
-                    else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.IsReplaceValue)).Any())
-                    {
-                        table.OperationType = OperationTypeEnum.ChangeColor;
-                    }
+                    ReSetTableOperationType(table, horizontalHeadRowCellList, verticalHeadRowCellList);
+
+                    ////lxz 2024-07-01 添加逻辑
+                    ////表格表头包含年份，却没有执行上面的替换逻辑，则表头应该替换颜色
+                    //if (table.OperationType == OperationTypeEnum.NotOperation && (
+                    //      horizontalHeadRowCellList.Any(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem))
+                    //      || verticalHeadRowCellList.Any(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem))
+                    //      || horizontalHeadRowCellList.Any(w => w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Disturb)
+                    //      ))
+                    //{
+                    //    table.OperationType = OperationTypeEnum.ChangeColor;
+                    //}
+                    //else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.IsReplaceValue)).Any())
+                    //{
+                    //    table.OperationType = OperationTypeEnum.ChangeColor;
+                    //}
                 }
                 catch (Exception ex)
                 {
@@ -968,13 +992,36 @@ namespace WordDemo
 
             var tabStopTableParagraphList = new List<List<WordParagraph>>();
 
+            string strRule1 = @"^[一-十|四]{1,3}、";
+            string strRule2 = @"^\d+(\.+){1,}";//以数字+.开头
+            string strRule3 = @"^\([a-z0-9]+\)\t";//以数字+.开头
+
             var paragraphList = new List<WordParagraph>();
             var prevParagraph = notUseParagraphs.FirstOrDefault();
             paragraphList.Add(prevParagraph);
+            var isTitle = false;
             for (int i = 1; i < notUseParagraphs.Count; i++)
             {
                 var currentParagraph = notUseParagraphs[i];
-                if (prevParagraph.ParagraphNumber + 1 == currentParagraph.ParagraphNumber)
+
+                //lxz 2024-07-25 添加判断标题逻辑
+                var paraOldText = currentParagraph.OldText;
+                if (Regex.IsMatch(paraOldText, strRule1)
+                    || Regex.IsMatch(paraOldText, strRule2)
+                    || Regex.IsMatch(paraOldText, strRule3))
+                {
+                    isTitle = true;
+                    prevParagraph = currentParagraph;
+                    continue;
+                }
+                if (isTitle)
+                {
+                    isTitle = false;
+                    tabStopTableParagraphList.Add(paragraphList);
+
+                    paragraphList = new List<WordParagraph>() { currentParagraph };
+                }
+                else if (prevParagraph.ParagraphNumber + 1 == currentParagraph.ParagraphNumber)
                 {
                     //连续段落
                     paragraphList.Add(currentParagraph);
@@ -997,6 +1044,7 @@ namespace WordDemo
 
             foreach (var tableParagraphList in tabStopTableParagraphList)
             {
+
                 var tableList = FindTables(tableParagraphList);
                 if (tableList.Any())
                 {
@@ -2397,7 +2445,7 @@ namespace WordDemo
                     }
                 }
             }
-            var row = table.Rows.Where(r => r.RowCells.Where(x => x.OldValue.Equals("人民币") || x.OldValue.Equals("折合人民币元") || x.OldValue.Equals("人民币元") || x.OldValue.Equals("%") || x.OldValue.Equals("美元")).Count() > 1).FirstOrDefault();
+            var row = table.Rows.Where(r => r.RowCells.Any(x => x.OldValue.Trim().Equals("人民币") || x.OldValue.Trim().Equals("折合人民币元") || x.OldValue.Trim().Equals("人民币元") || x.OldValue.Trim().Equals("%") || x.OldValue.Trim().Equals("美元"))).FirstOrDefault();
             if (row != null)
             {
                 if (headMaxNumber < row.RowNumber)
@@ -2518,6 +2566,8 @@ namespace WordDemo
                 }
             }
         }
+
+
 
         /// <summary>
         /// 生成制表位表格单元格新值
@@ -2730,7 +2780,7 @@ namespace WordDemo
         /// <returns></returns>
         private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables)
         {
-            var currentTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(currentTable.HeadRows)).ReplaceDate();
+            var currentTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(currentTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
             var prevTableNumber = currentTable.TableNumber - 1;
             var prevTable = tables.FirstOrDefault(w => w.TableNumber == prevTableNumber);
             var prevTableHeadRowContent = string.Empty;
@@ -2747,6 +2797,234 @@ namespace WordDemo
             }
             bool isTheSameHeadRow = currentTableHeadRowContent == prevTableHeadRowContent || currentTableHeadRowContent == nextTableHeadRowContent;
             return isTheSameHeadRow;
+        }
+
+        /// <summary>
+        /// 合并表格
+        /// </summary>
+        /// <param name="tables"></param>
+        private static void MergeTables(List<WordTable> tables)
+        {
+            /*
+             * 合并表格，第一个表格有表头，后续连续表格无表头且列数相同，则认为是同一个表格需要合并为一个表格；
+             * 1.判断列数相同
+             * 2.判断子表无表头
+             * 3.存储连续无表头子表
+             * 4.合并子表
+             * 5.删除合并后的子表，并重新设置表格编号
+             */
+            WordTable currnetTable = null;
+            try
+            {
+                var tableCount = tables.Count;
+                int index = 0;
+                //需要删除的表格下标
+                var removeList = new List<int>();
+
+                //根据下标循环表格
+                while (index < tableCount)
+                {
+                    var table = tables[index];
+                    currnetTable = table;
+                    var nextIndex = index + 1;
+                    //获取当前表格的最大列表数
+                    var tableCol = table.Rows.Max(x => x.RowCells.Count);
+
+                    //默认数据开始列从第一列开始，下标从0开始
+                    var startNumCol = 1;
+                    //获取数据开始列
+                    for (int _colIndex = 1; _colIndex < tableCol; _colIndex++)
+                    {
+                        var isEmpty = true;
+                        var isBreak = false;
+                        for (int _rowIndex = 0; _rowIndex < table.Rows.Count; _rowIndex++)
+                        {
+                            var _row = table.Rows[_rowIndex];
+                            if (_row.RowCells.Count <= _colIndex)
+                            {
+                                continue;
+                            }
+                            var _cell = _row.RowCells[_colIndex];
+                            if (!string.IsNullOrWhiteSpace(_cell.OldValue) && isEmpty)
+                            {
+                                isEmpty = false;
+                            }
+                            if (Regex.IsMatch(_cell.OldValue, @"\d{4}|[\u4e00-\u9fa5]"))
+                            {
+                                continue;
+                            }
+                            if (Regex.IsMatch(_cell.OldValue, @"\d+"))
+                            {
+                                startNumCol = _colIndex;
+                                isBreak = true;
+                                break;
+                            }
+                        }
+                        if (isEmpty || isBreak)
+                        {
+                            startNumCol = _colIndex;
+                            break;
+                        }
+
+                    }
+
+                    //当前表格子级表格
+                    var currentTableList = new List<WordTable>();
+                    while (nextIndex < tableCount)
+                    {
+                        var nextTable = tables[nextIndex];
+                        var nextTableCol = nextTable.Rows.Max(x => x.RowCells.Count);
+
+                        if (nextTableCol == tableCol)
+                        {
+                            var isEmpty = true;
+                            if (nextTable.HeadRows.Any())
+                            {
+                                for (int i = 0; i < nextTable.HeadRows.Count; i++)
+                                {
+                                    var nextTableHeadRow = nextTable.HeadRows[i];
+                                    for (int c = startNumCol; c < nextTableHeadRow.RowCells.Count; c++)
+                                    {
+                                        var val = nextTableHeadRow.RowCells[c]?.OldValue?.Trim();
+                                        if (!string.IsNullOrWhiteSpace(val) && Regex.IsMatch(val, @"\d{4}|[\u4e00-\u9fa5]|[a-zA-Z]"))
+                                        {
+                                            isEmpty = false;
+                                            break;
+                                        }
+                                    }
+                                    if (!isEmpty)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!isEmpty)
+                            {
+                                break;
+                            }
+                            currentTableList.Add(nextTable);
+                            removeList.Add(nextIndex);
+                            index = nextIndex;
+                            nextIndex = index + 1;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    //合并表格
+                    if (currentTableList.Any())
+                    {
+                        var tempRowNumber = table.Rows.Max(x => x.RowNumber);
+                        foreach (var subTable in currentTableList)
+                        {
+                            List<WordTableRow> tRows = new List<WordTableRow>();
+                            for (int idx = 0; idx < subTable.Rows.Count; idx++)
+                            {
+                                tempRowNumber++;
+                                var subRow = subTable.Rows[idx];
+                                WordTableRow trow = new WordTableRow()
+                                {
+                                    IsMatchRowRange = subRow.IsMatchRowRange,
+                                    Range = subRow.Range,
+                                    RowNumber = tempRowNumber,
+                                };
+
+                                for (int c = 0; c < subRow.RowCells.Count; c++)
+                                {
+                                    var subCell = subRow.RowCells[c];
+                                    WordTableCell tcell = new WordTableCell
+                                    {
+                                        ActualStartColumnIndex = subCell.ActualStartColumnIndex,
+                                        CellChars = subCell.CellChars,
+                                        ChilderCells = subCell.ChilderCells,
+                                        ColSpan = subCell.ColSpan,
+                                        IsHeadColumn = false,
+                                        IsReplaceValue = subCell.IsReplaceValue,
+                                        Length = subCell.Length,
+                                        MinX = subCell.MinX,
+                                        MinY = subCell.MinY,
+                                        NewValue = subCell.NewValue,
+                                        Offset = subCell.Offset,
+                                        OldValue = subCell.OldValue,
+                                        PageNumber = subCell.PageNumber,
+                                        Range = subCell.Range,
+                                        RowSpan = subCell.RowSpan,
+                                        VMergeVal = subCell.VMergeVal,
+                                        YPositiondifference = subCell.YPositiondifference,
+                                        StartColumnIndex = subCell.StartColumnIndex,
+                                        StartRowIndex = trow.RowNumber,
+                                    };
+                                    trow.RowCells.Add(tcell);
+                                }
+                                tRows.Add(trow);
+                            }
+                            table.Rows.AddRange(tRows);
+                        }
+                    }
+                    index++;
+                }
+                if (removeList.Any())
+                {
+                    removeList.Reverse();
+                    foreach (var item in removeList)
+                    {
+                        tables.RemoveAt(item);
+                    }
+                    var t_idx = 1;
+                    foreach (var item in tables)
+                    {
+                        item.TableNumber = t_idx;
+
+                        t_idx++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var msg = "";
+                if (currnetTable != null)
+                {
+                    //currnetTable.PageNumber;
+                    msg = $",开始行内容:{currnetTable.FirstRowContent};结束行内容：{currnetTable.LastRowContent}";
+                }
+                throw new Exception($"合并表格失败{msg}！ex:{ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 拆分表格
+        /// </summary>
+        /// <param name="tables"></param>
+        private static List<WordTable> SplitTables(List<WordTable> tables)
+        {
+            var needAddTableList = new List<WordTable>();
+            var needDeleteTableList = new List<WordTable>();
+
+            foreach (var table in tables)
+            {
+                var splitResultList = FindTables(table);
+                if (splitResultList.Count > 1)
+                {
+                    needAddTableList.AddRange(splitResultList);
+                    needDeleteTableList.Add(table);
+                }
+            }
+            if (needAddTableList.Any() && needDeleteTableList.Any())
+            {
+                foreach (var deleteTable in needDeleteTableList)
+                {
+                    tables.Remove(deleteTable);
+                }
+                tables.AddRange(needAddTableList);
+                tables = tables.OrderBy(o => o.PageNumber).ToList();
+                tables.ForEach(table =>
+                {
+                    table.TableNumber = tables.IndexOf(table) + 1;
+                });
+            }
+
+            return tables;
         }
 
         #endregion
@@ -3069,6 +3347,107 @@ namespace WordDemo
 
         }
 
+        /// <summary>
+        /// 根据表格行获取拆分表格
+        /// </summary>
+        /// <param name="table"></param>
+        /// <returns></returns>
+        private static List<WordTable> FindTables(WordTable table)
+        {
+            var tableList = new List<WordTable>();
+
+            var tableStartRowIndexList = new List<int>();
+            var tableHeadRowEndRowIndexList = new List<int>();
+
+            //查找人民币元当表头结束行
+            for (int i = 0; i < table.Rows.Count; i++)
+            {
+                var row = table.Rows[i];
+                if (new string[] { "人民币", "人民币元" }.Any(w => row.RowContent.Contains(w)))
+                {
+                    tableHeadRowEndRowIndexList.Add(i);
+                }
+            }
+
+            //没有人民币元 查找上下两行都不为空的空行的上一行当表头结束行
+            if (tableHeadRowEndRowIndexList.Count == 0)
+            {
+                for (int i = 0; i < table.Rows.Count; i++)
+                {
+                    if (i > 0 && i < table.Rows.Count - 1 && string.IsNullOrWhiteSpace(table.Rows[i].RowContent.Trim()))
+                    {
+                        var prevRow = table.Rows[i - 1];
+                        var nextRow = table.Rows[i + 1];
+                        if (!string.IsNullOrWhiteSpace(prevRow.RowContent.Trim()) && !string.IsNullOrWhiteSpace(nextRow.RowContent.Trim()))
+                        {
+                            tableHeadRowEndRowIndexList.Add(i - 1);
+                        }
+                    }
+                }
+            }
+
+            //如果当前表只找到一个表头 当前表不拆分
+            if (tableHeadRowEndRowIndexList.Count <= 1)
+            {
+                return tableList;
+            }
+
+            //从表头结束行往上找 遇到空行和数据行截止
+            for (int i = 0; i < tableHeadRowEndRowIndexList.Count; i++)
+            {
+                //列表开始行
+                int tableStartIndex = tableHeadRowEndRowIndexList[i];
+                while (true)
+                {
+                    tableStartIndex--;
+                    var startRow = table.Rows[tableStartIndex];
+
+                    if (tableStartIndex == 0)
+                    {
+                        tableStartRowIndexList.Add(tableStartIndex);
+                        break;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(startRow.RowContent.Trim()) || startRow.RowContent.IsWordTableDateRow())
+                    {
+                        //取空行或者数据行的下一行当表头开始行
+                        tableStartIndex++;
+                        tableStartRowIndexList.Add(tableStartIndex);
+                        break;
+                    }
+                }
+            }
+
+            //组装分割table
+            for (int i = 0; i < tableStartRowIndexList.Count; i++)
+            {
+                var tableStartIndex = tableStartRowIndexList[i];
+                var tableHeadEndIndex = tableHeadRowEndRowIndexList[i];
+                //取下一个表格的开始表头的上一行当当前表格的结束行
+                var tableEndIndex = i < tableStartRowIndexList.Count - 1 ? tableStartRowIndexList[i + 1] - 1 : table.Rows.Count - 1;
+                var newTable = new WordTable()
+                {
+                    PageNumber = table.PageNumber,
+                    IsMatchWordParagraph = table.IsMatchWordParagraph,
+                    OperationType = table.OperationType,
+                    TableSourceType = table.TableSourceType
+                };
+                for (int r = tableStartIndex; r <= tableEndIndex; r++)
+                {
+                    var row = table.Rows[r];
+                    if (r <= tableHeadEndIndex)
+                    {
+                        row.RowCells.ForEach(f => { f.IsHeadColumn = true; });
+                    }
+                    newTable.Rows.Add(row);
+                }
+                tableList.Add(newTable);
+
+            }
+
+            return tableList;
+        }
+
         private static bool IsParaUnderline(WordParagraph paragraph)
         {
             var txt = paragraph.OldText.TrimEnd('\r');
@@ -3179,180 +3558,8 @@ namespace WordDemo
 
         #endregion
 
-        /// <summary>
-        /// 合并表格
-        /// </summary>
-        /// <param name="tables"></param>
-        private static void MergeTables(List<WordTable> tables)
-        {
-            /*
-             * 合并表格，第一个表格有表头，后续连续表格无表头且列数相同，则认为是同一个表格需要合并为一个表格；
-             * 1.判断列数相同
-             * 2.判断子表无表头
-             * 3.存储连续无表头子表
-             * 4.合并子表
-             * 5.删除合并后的子表，并重新设置表格编号
-             */
 
-            var tableCount = tables.Count;
-            int index = 0;
-            //需要删除的表格下标
-            var removeList = new List<int>();
 
-            //根据下标循环表格
-            while (index < tableCount)
-            {
-                var table = tables[index];
-                var nextIndex = index + 1;
-                //获取当前表格的最大列表数
-                var tableCol = table.Rows.Max(x => x.RowCells.Count);
-
-                //默认数据开始列从第一列开始，下标从0开始
-                var startNumCol = 1;
-                //获取数据开始列
-                for (int _colIndex = 1; _colIndex < tableCol; _colIndex++)
-                {
-                    var isEmpty = true;
-                    var isBreak = false;
-                    for (int _rowIndex = 0; _rowIndex < table.Rows.Count; _rowIndex++)
-                    {
-                        var _row = table.Rows[_rowIndex];
-                        var _cell = _row.RowCells[_colIndex];
-                        if (!string.IsNullOrWhiteSpace(_cell.OldValue) && isEmpty)
-                        {
-                            isEmpty = false;
-                        }
-                        if (Regex.IsMatch(_cell.OldValue, @"\d{4}|[\u4e00-\u9fa5]"))
-                        {
-                            continue;
-                        }
-                        if (Regex.IsMatch(_cell.OldValue, @"\d+"))
-                        {
-                            startNumCol = _colIndex;
-                            isBreak = true;
-                            break;
-                        }
-                    }
-                    if (isEmpty || isBreak)
-                    {
-                        startNumCol = _colIndex;
-                        break;
-                    }
-
-                }
-
-                //当前表格子级表格
-                var currentTableList = new List<WordTable>();
-                while (nextIndex < tableCount)
-                {
-                    var nextTable = tables[nextIndex];
-                    var nextTableCol = nextTable.Rows.Max(x => x.RowCells.Count);
-
-                    if (nextTableCol == tableCol)
-                    {
-                        var isEmpty = true;
-                        if (nextTable.HeadRows.Any())
-                        {
-                            for (int i = 0; i < nextTable.HeadRows.Count; i++)
-                            {
-                                var nextTableHeadRow = nextTable.HeadRows[i];
-                                for (int c = startNumCol; c < nextTableHeadRow.RowCells.Count; c++)
-                                {
-                                    var val = nextTableHeadRow.RowCells[c]?.OldValue?.Trim();
-                                    if (!string.IsNullOrWhiteSpace(val) && Regex.IsMatch(val, @"\d{4}|[\u4e00-\u9fa5]|[a-zA-Z]"))
-                                    {
-                                        isEmpty = false;
-                                        break;
-                                    }
-                                }
-                                if (!isEmpty)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-                        if (!isEmpty)
-                        {
-                            break;
-                        }
-                        currentTableList.Add(nextTable);
-                        removeList.Add(nextIndex);
-                        index = nextIndex;
-                        nextIndex = index + 1;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                //合并表格
-                if (currentTableList.Any())
-                {
-                    var tempRowNumber = table.Rows.Max(x => x.RowNumber);
-                    foreach (var subTable in currentTableList)
-                    {
-                        List<WordTableRow> tRows = new List<WordTableRow>();
-                        for (int idx = 0; idx < subTable.Rows.Count; idx++)
-                        {
-                            tempRowNumber++;
-                            var subRow = subTable.Rows[idx];
-                            WordTableRow trow = new WordTableRow()
-                            {
-                                IsMatchRowRange = subRow.IsMatchRowRange,
-                                Range = subRow.Range,
-                                RowNumber = tempRowNumber,
-                            };
-
-                            for (int c = 0; c < subRow.RowCells.Count; c++)
-                            {
-                                var subCell = subRow.RowCells[c];
-                                WordTableCell tcell = new WordTableCell
-                                {
-                                    ActualStartColumnIndex = subCell.ActualStartColumnIndex,
-                                    CellChars = subCell.CellChars,
-                                    ChilderCells = subCell.ChilderCells,
-                                    ColSpan = subCell.ColSpan,
-                                    IsHeadColumn = false,
-                                    IsReplaceValue = subCell.IsReplaceValue,
-                                    Length = subCell.Length,
-                                    MinX = subCell.MinX,
-                                    MinY = subCell.MinY,
-                                    NewValue = subCell.NewValue,
-                                    Offset = subCell.Offset,
-                                    OldValue = subCell.OldValue,
-                                    PageNumber = subCell.PageNumber,
-                                    Range = subCell.Range,
-                                    RowSpan = subCell.RowSpan,
-                                    VMergeVal = subCell.VMergeVal,
-                                    YPositiondifference = subCell.YPositiondifference,
-                                    StartColumnIndex = subCell.StartColumnIndex,
-                                    StartRowIndex = trow.RowNumber,
-                                };
-                                trow.RowCells.Add(tcell);
-                            }
-                            tRows.Add(trow);
-                        }
-                        table.Rows.AddRange(tRows);
-                    }
-                }
-                index++;
-            }
-            if (removeList.Any())
-            {
-                removeList.Reverse();
-                foreach (var item in removeList)
-                {
-                    tables.RemoveAt(item);
-                }
-                var t_idx = 1;
-                foreach (var item in tables)
-                {
-                    item.TableNumber = t_idx;
-
-                    t_idx++;
-                }
-            }
-        }
 
     }
 }
