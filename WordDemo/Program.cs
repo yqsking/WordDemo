@@ -45,9 +45,9 @@ namespace WordDemo
         {
             var wordTables = new List<WordTable>();
             ////制表位日期
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.pdf");
 
             //制表位关键字
             //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）.docx");
@@ -64,9 +64,9 @@ namespace WordDemo
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/实线格式-1003914-0046-00-00-B1A-德师报(审)字(24)第P02306号.pdf");
 
             //temp
-            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.docx");
-            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.json");
-            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.pdf");
 
             string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 

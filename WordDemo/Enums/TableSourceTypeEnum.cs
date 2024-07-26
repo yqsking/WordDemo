@@ -17,6 +17,11 @@ namespace WordDemo.Enums
         /// <summary>
         /// 制表位计算
         /// </summary>
-        TabStopCompute=2
+        TabStopCompute=2,
+
+        /// <summary>
+        /// 分割表格
+        /// </summary>
+        SplitTable=3
     }
 }

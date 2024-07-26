@@ -62,6 +62,8 @@
   <ItemGroup>
     <Compile Include="Constants\ApiConstant.cs" />
     <Compile Include="Dtos\FormattingWordTableConfig.cs" />
+    <Compile Include="Dtos\IProgressModel.cs" />
+    <Compile Include="Dtos\NodeNotifyEventArgs.cs" />
     <Compile Include="Enums\HorizontalPositionTypeEnum.cs" />
     <Compile Include="Enums\ReplaceMatchItemTypeEnum.cs" />
     <Compile Include="Enums\OperationTypeEnum.cs" />
@@ -160,6 +162,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="TestFiles\上海汇众汽车车桥系统有限公司.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestFiles\上海畅帆投资管理咨询服务有限公司.docx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="TestFiles\上海畅帆投资管理咨询服务有限公司.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="TestFiles\可功科技.docx">
