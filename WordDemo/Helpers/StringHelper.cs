@@ -141,6 +141,24 @@ namespace System
         }
 
         /// <summary>
+        /// 替换所有匹配项为空
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string ReplaceAllReplaceItem(this string str)
+        {
+            var allReplaceItemList= str.GetAllReplaceItemList();
+            if(allReplaceItemList.Any())
+            {
+                foreach(var replaceItem in allReplaceItemList)
+                {
+                    str = str.Replace(replaceItem, "");
+                }
+            }
+            return str;
+        }
+
+        /// <summary>
         /// 替换文本中的日期为空
         /// </summary>
         /// <param name="str"></param>
@@ -313,9 +331,13 @@ namespace System
         /// <returns></returns>
         public static bool IsWordTableDateRow(this string rowContent)
         {
-            bool isContainDate = Regex.IsMatch(rowContent, "(\\d{4}年)|(\\d{1,2})(月|日)");
-            bool isContainMoney = Regex.IsMatch(rowContent, "(\\d{3},)|(\\d+)");
-            return !isContainDate && isContainMoney;
+            string dateString= rowContent.GetDateString();
+            if(!string.IsNullOrWhiteSpace(dateString))
+            {
+                rowContent = rowContent.Replace(dateString, "");
+            }
+            bool isContainMoney = Regex.IsMatch(rowContent, "((\\d{1,3},\\d+)+)|(\\b(?!\\d{4,})\\d+\\b)|-");
+            return  isContainMoney;
         }
 
     }

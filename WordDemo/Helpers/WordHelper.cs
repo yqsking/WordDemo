@@ -447,7 +447,7 @@ namespace WordDemo
 
                 }
 
-                if (table.TableContentStartParagraphNumber <= 0 || table.TableContentEndParagraphNumber <= 0)
+                if (table.TableContentStartParagraphNumber <= 0||table.TableContentStartParagraphNumber==null || table.TableContentEndParagraphNumber <= 0||table.TableContentEndParagraphNumber==null)
                 {
                     var errorMsg = new StringBuilder();
                     errorMsg.AppendLine($"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能匹配到Word段落!");
@@ -483,17 +483,17 @@ namespace WordDemo
             var identifyFailTabStopTableList = GetIdentifyFailTabStopTableList(notUseParagraphList, tableList);
             if (identifyFailTabStopTableList.Any())
             {
-                foreach (var table in identifyFailTabStopTableList)
-                {
-                    table.TableNumber = tableList.Count + 1;
-                    tableList.Add(table);
-                }
+                tableList.AddRange(identifyFailTabStopTableList);
             }
 
             Cancel.ThrowIfCancellationRequested();
             SplitTables(tableList, errorMsg_Event);
 
-
+            //过滤ConsoleError 重新排序
+            tableList = tableList.Where(w => w.OperationType != OperationTypeEnum.ConsoleError).OrderBy(o=>o.TableContentStartParagraphNumber).ToList();
+            tableList.ForEach(f => {
+                f.TableNumber = tableList.IndexOf(f) + 1;
+            });
             Cancel.ThrowIfCancellationRequested();
             //生成制表位单元格新值
             BuildTabStopTableCellNewValue(tableList, errorMsg_Event);
@@ -1094,7 +1094,7 @@ namespace WordDemo
             var tabStopTableParagraphList = new List<List<WordParagraph>>();
 
             string strRule1 = @"^[一-十|四]{1,3}、\t";
-            string strRule2 = @"^\d+(\.+){1,}";//以数字+.开头
+            string strRule2 = @"^\d+(\.+){1,}\t";//以数字+.开头
             string strRule3 = @"^\([a-z0-9]+\)\t";//以数字+.开头
 
             var paragraphList = new List<WordParagraph>();
@@ -2898,20 +2898,21 @@ namespace WordDemo
         /// <returns></returns>
         private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables)
         {
-            var currentTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(currentTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
+
+            var currentTableHeadRowContent = string.Join("", currentTable.HeadRows.SelectMany(s => s.RowCells).Select(s=>s.OldValue).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem();
             var prevTableNumber = currentTable.TableNumber - 1;
             var prevTable = tables.FirstOrDefault(w => w.TableNumber == prevTableNumber);
             var prevTableHeadRowContent = string.Empty;
             if (prevTable != null)
             {
-                prevTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(prevTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
+                prevTableHeadRowContent = string.Join("", prevTable.HeadRows.SelectMany(s => s.RowCells).Select(s => s.OldValue).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem();
             }
             var nextTableNumber = currentTable.TableNumber + 1;
             var nextTable = tables.FirstOrDefault(w => w.TableNumber == nextTableNumber);
             string nextTableHeadRowContent = string.Empty;
             if (nextTable != null)
             {
-                nextTableHeadRowContent = string.Join("", GetHorizontalMergeTableHeadRow(nextTable.HeadRows).Select(s => s.CellValue)).ReplaceDate();
+                nextTableHeadRowContent = string.Join("", nextTable.HeadRows.SelectMany(s => s.RowCells).Select(s => s.OldValue).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem();
             }
             bool isTheSameHeadRow = currentTableHeadRowContent == prevTableHeadRowContent || currentTableHeadRowContent == nextTableHeadRowContent;
             return isTheSameHeadRow;
@@ -3576,8 +3577,8 @@ namespace WordDemo
                 for (int r = tableStartIndex; r <= tableEndIndex; r++)
                 {
                     var row = table.Rows[r];
-                    //如果包含标题 跳过
-                    if (!string.IsNullOrWhiteSpace(row.RowContent.MatchWordTitle()))
+                    //如果在表头范围内包含标题 跳过
+                    if (r<=tableHeadEndIndex&& !string.IsNullOrWhiteSpace(row.RowContent.MatchWordTitle()))
                     {
                         continue;
                     }
@@ -3617,24 +3618,27 @@ namespace WordDemo
 
         private static bool isCurrencyRow(string[] cells)
         {
+            
             if (cells.Length <= 1)
             {
                 return false;
             }
-            else
-            {
-                //正常情况下货币单位在最后一个单元格，但也有一些表格最后是%，向前推
-                for (int i = cells.Length - 1; i > 0; i--)
-                {
-                    string cell = cells[i];
-                    if (cell.Trim().Equals("%"))
-                        continue;
-                    else
-                        return isCurrencyCell(cell);
+            string rowValue = string.Join("", cells);
+            return new string[] { "人民币", "人民币元" }.Any(w => rowValue.Contains(w));
+            //else
+            //{
+            //    //正常情况下货币单位在最后一个单元格，但也有一些表格最后是%，向前推
+            //    for (int i = cells.Length - 1; i > 0; i--)
+            //    {
+            //        string cell = cells[i];
+            //        if (cell.Trim().Equals("%"))
+            //            continue;
+            //        else
+            //            return isCurrencyCell(cell);
 
-                }
-                return false;
-            }
+            //    }
+            //    return false;
+            //}
         }
 
         public static bool isCurrencyCell(string cell)
