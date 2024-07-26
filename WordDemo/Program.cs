@@ -23,7 +23,7 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-           
+
             GetOcrTableCellReplaceRule();
 
             //FormattingWord(new FormattingWordTableConfig

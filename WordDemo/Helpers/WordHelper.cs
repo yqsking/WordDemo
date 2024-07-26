@@ -295,7 +295,6 @@ namespace WordDemo
             $"开始匹配OCR表格内容起始段落和单元格Range".Console(ConsoleColor.Yellow);
             #region
             watch.Restart();
-            //foreach (var table in tableList)
             var tbCount = tableList.Count;
             for (int i = 0; i < tbCount; i++)
             {
@@ -1144,14 +1143,23 @@ namespace WordDemo
             //排除连续段落 包含\t段落数量少于2个段落的
             tabStopTableParagraphList = tabStopTableParagraphList.Where(w => w.Count(ww => ww.OldText.Contains("\t")) >= 2).ToList();
 
+            int forNumber = 0;
             foreach (var tableParagraphList in tabStopTableParagraphList)
             {
-
-                var tableList = FindTables(tableParagraphList);
-                if (tableList.Any())
+                forNumber++;
+                try
                 {
-                    identifyFailTabStopTableList.AddRange(tableList);
+                    var tableList = FindTables(tableParagraphList);
+                    if (tableList.Any())
+                    {
+                        identifyFailTabStopTableList.AddRange(tableList);
+                    }
                 }
+                catch (Exception ex)
+                {
+                    $"第{forNumber}次循环获取第{tableParagraphList.FirstOrDefault().PageNumber}页连续按段落制表位表格失败，{ex.Message}".Console(ConsoleColor.Red);
+                }
+
             }
 
             foreach (var table in identifyFailTabStopTableList)
@@ -1169,7 +1177,6 @@ namespace WordDemo
 
             return identifyFailTabStopTableList;
         }
-
 
         /// <summary>
         /// 获取word物理行列表
@@ -2672,8 +2679,6 @@ namespace WordDemo
             }
         }
 
-
-
         /// <summary>
         /// 生成制表位表格单元格新值
         /// </summary>
@@ -3293,14 +3298,14 @@ namespace WordDemo
                 for (int j = bodyStart + 1; j <= e_row; j++)
                 {
                     var t_para = paragraphs[j];
-                    string matchWordTitle = t_para.OldText.MatchWordTitle();
+                    string matchWordTitle = t_para.OldText.MatchWordTitle(true);
                     if (t_para.OldText.Contains("\f"))
                     {
                         //遇到分页符当前表结束
                         e_row = j - 1;
                         break;
                     }
-                    else if (!string.IsNullOrWhiteSpace(matchWordTitle) && t_para.OldText.Contains("\t"))
+                    else if (!string.IsNullOrWhiteSpace(matchWordTitle))
                     {
                         //遇到标题且带\t
                         e_row = j - 1;
@@ -3410,14 +3415,16 @@ namespace WordDemo
                     }
                 }
 
+                tableHeadRowParagraphList = tableHeadRowParagraphList.Where(w => !w.IsEmptyParagraph).ToList();
+                tableDataRowParagraphList = tableDataRowParagraphList.Where(w => !w.IsEmptyParagraph).ToList();
                 var table = new WordTable()
                 {
                     TableSourceType = TableSourceTypeEnum.TabStopCompute,
                     PageNumber = paragraphs[start].PageNumber,
                     TableNumber = tableList.Count + 1,
                     IsMatchWordParagraph = true,
-                    TableContentStartParagraphNumber = tableHeadRowParagraphList.Where(w => !w.IsEmptyParagraph).Min(w => w.ParagraphNumber),
-                    TableContentEndParagraphNumber = tableDataRowParagraphList.Where(w => !w.IsEmptyParagraph).Max(w => w.ParagraphNumber)
+                    TableContentStartParagraphNumber = tableHeadRowParagraphList!=null&&tableHeadRowParagraphList.Any()? tableHeadRowParagraphList.Min(w => w.ParagraphNumber):0,
+                    TableContentEndParagraphNumber = tableDataRowParagraphList!=null&&tableDataRowParagraphList.Any()? tableDataRowParagraphList.Max(w => w.ParagraphNumber):0
                 };
                 foreach (WordParagraph para in tableHeadRowParagraphList)
                 {
@@ -3425,8 +3432,6 @@ namespace WordDemo
                     {
                         continue;
                     }
-                    //var paraSplitResults=para.OldText.StartsWith("\t")? para.OldText.Remove(0,1).TrimEnd('\r').Split('\t')
-                    //    :para.OldText.TrimEnd('\r').Split('\t');
                     var paraSplitResults = para.OldText.TrimEnd('\r').Split('\t');
                     var tableRow = new WordTableRow
                     {

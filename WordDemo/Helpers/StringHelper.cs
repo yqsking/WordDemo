@@ -157,14 +157,15 @@ namespace System
         /// 匹配字符串中的word标题，如果不存在返回空字符串
         /// </summary>
         /// <param name="str"></param>
+        /// <param name="isContaintTabStop">标题中是否包含\t</param>
         /// <returns></returns>
-        public static string MatchWordTitle(this string str)
+        public static string MatchWordTitle(this string str,bool isContaintTabStop=false)
         {
             string matchTitle = "";
             //标题类型：一、 1. （1） (1) (a)（a）（ii）（ii）
             var titlePatterns = new string[] {
                    @"^[零一二三四五六七八九十]+、", //一、
-                   @"^\d+\.",//1.
+                   @"^\d+\.\t",//1.
                    @"^（\d+）",//（1）
                    @"^\(\d+\)",//(1)
                    @"^\d+\)",//1)
@@ -175,7 +176,8 @@ namespace System
                 };
             foreach (var titlePattern in titlePatterns)
             {
-                var matchResult = Regex.Match(str, titlePattern);
+                var tempTitlePattern = isContaintTabStop ? $"{titlePattern}\t" : titlePattern;
+                var matchResult = Regex.Match(str, tempTitlePattern);
                 if (matchResult.Success)
                 {
                     matchTitle = matchResult.Value;
@@ -262,7 +264,7 @@ namespace System
         /// <returns></returns>
         public static bool IsContains(this string str1,string str2)
         {
-            return str1.Length>str2.Length?Regex.IsMatch(str1,str2):Regex.IsMatch(str2,str1);
+            return str1.Length>=str2.Length?Regex.IsMatch(str1,str2):Regex.IsMatch(str2,str1);
         }
 
         /// <summary>

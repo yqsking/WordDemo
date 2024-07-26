@@ -46,12 +46,12 @@ namespace WordDemo
         /// <summary>
         /// 表格内容开始段落
         /// </summary>
-        public int TableContentStartParagraphNumber {  get; set; }
+        public int? TableContentStartParagraphNumber {  get; set; }
 
         /// <summary>
         /// 表格内容结束段落
         /// </summary>
-        public int TableContentEndParagraphNumber {  get; set; }
+        public int? TableContentEndParagraphNumber {  get; set; }
 
         /// <summary>
         /// 表格在word的段落
