@@ -91,7 +91,7 @@ namespace WordDemo
         /// <param name="ocrJson">ocr识别的json文件</param>
         /// <param name="doc">word文档对象</param>
         /// <returns></returns>
-        public static List<WordTable> GetWordTableList(string ocrJson, Document doc, CancellationToken Cancel = default, Action<object,Events.NodeNotifyEventArgs> errorMsg_Event = null)
+        public static List<WordTable> GetWordTableList(string ocrJson, Document doc, CancellationToken Cancel = default, Action<object, Events.NodeNotifyEventArgs> errorMsg_Event = null)
         {
             var tableList = new List<WordTable>();
             var normalTableList = new List<WordTable>();
@@ -295,6 +295,7 @@ namespace WordDemo
             $"开始匹配OCR表格内容起始段落和单元格Range".Console(ConsoleColor.Yellow);
             #region
             watch.Restart();
+            //foreach (var table in tableList)
             var tbCount = tableList.Count;
             for (int i = 0; i < tbCount; i++)
             {
@@ -447,7 +448,7 @@ namespace WordDemo
 
                 }
 
-                if (table.TableContentStartParagraphNumber <= 0||table.TableContentStartParagraphNumber==null || table.TableContentEndParagraphNumber <= 0||table.TableContentEndParagraphNumber==null)
+                if (table.TableContentStartParagraphNumber <= 0 || table.TableContentStartParagraphNumber == null || table.TableContentEndParagraphNumber <= 0 || table.TableContentEndParagraphNumber == null)
                 {
                     var errorMsg = new StringBuilder();
                     errorMsg.AppendLine($"第{table.PageNumber}页第{table.TableNumber}个表格({table.FirstRowContent})未能匹配到Word段落!");
@@ -489,11 +490,13 @@ namespace WordDemo
             Cancel.ThrowIfCancellationRequested();
             SplitTables(tableList, errorMsg_Event);
 
+
             //过滤ConsoleError 重新排序
-            tableList = tableList.Where(w => w.OperationType != OperationTypeEnum.ConsoleError).OrderBy(o=>o.TableContentStartParagraphNumber).ToList();
+            tableList = tableList.Where(w => w.OperationType != OperationTypeEnum.ConsoleError).OrderBy(o => o.TableContentStartParagraphNumber).ToList();
             tableList.ForEach(f => {
                 f.TableNumber = tableList.IndexOf(f) + 1;
             });
+
             Cancel.ThrowIfCancellationRequested();
             //生成制表位单元格新值
             BuildTabStopTableCellNewValue(tableList, errorMsg_Event);
@@ -825,6 +828,7 @@ namespace WordDemo
                     }
                 }
                 table.Rows = temp_rowList;
+
                 //第一个单元格垂直合并数量
                 int firstCellRowSpan = table.Rows.FirstOrDefault().RowCells.FirstOrDefault().RowSpan;
                 //lxz 判断是否有【人民币元】和空行，
@@ -916,6 +920,8 @@ namespace WordDemo
                 {
 
                     #region 同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
+
+                    var lst = table.LastRowContent;
 
                     var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(table.HeadRows);
 
@@ -1178,6 +1184,7 @@ namespace WordDemo
             return identifyFailTabStopTableList;
         }
 
+
         /// <summary>
         /// 获取word物理行列表
         /// </summary>
@@ -1434,12 +1441,18 @@ namespace WordDemo
             //同列表头内容合并 
             var headCellList = completionWordTableHeadRows.SelectMany(s => s.RowCells).ToList();
             int maxStartColumnIndex = headCellList.Max(m => m.StartColumnIndex);
+            Dictionary<int, string> dicDisturb = new Dictionary<int, string>();
             for (int i = 1; i <= maxStartColumnIndex; i++)
             {
                 var columnCellList = headCellList.Where(w => w.StartColumnIndex == i).OrderBy(o => o.StartRowIndex)
                     .Select(s => s.OldValue).ToList();
                 string columnCellJoinValue = string.Join("", columnCellList);
                 var getCellContainResult = GetCellContainReplaceMatchItem(columnCellJoinValue);
+                if (getCellContainResult.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Disturb)
+                {
+                    dicDisturb.Add(i, columnCellJoinValue);
+                }
+
                 mergeHeadRowCells.Add(
                     new ReplaceCell
                     {
@@ -1449,7 +1462,121 @@ namespace WordDemo
                         ReplaceMatchItemType = getCellContainResult.ReplaceMatchItemType
                     });
             }
+
+            ReCellReplaceMathItemType(mergeHeadRowCells, dicDisturb);
+
             return mergeHeadRowCells;
+        }
+        /// <summary>
+        /// 重新判断有排除项的单元格
+        /// </summary>
+        /// <param name="mergeHeadRowCells"></param>
+        /// <param name="dicDisturb"></param>
+        private static void ReCellReplaceMathItemType(List<ReplaceCell> mergeHeadRowCells, Dictionary<int, string> dicDisturb)
+        {
+            if (dicDisturb.Count >= 2)
+            {
+                try
+                {
+                    var keys = dicDisturb.Keys.ToList();
+                    var vals = dicDisturb.Values.ToList();
+                    var useList = new List<ReplaceCell>();
+                    foreach (var index in keys)
+                    {
+                        if (useList.Any(u => u.Index == index))
+                        {
+                            continue;
+                        }
+                        var joinStr = dicDisturb[index];
+                        var k_replcaceItem_list = joinStr.GetAllReplaceItemList();
+                        if (k_replcaceItem_list.Count > 0)
+                        {
+                            foreach (var item in k_replcaceItem_list)
+                            {
+                                var r_joinStr = joinStr.Replace(item, "");
+                                if (string.IsNullOrEmpty(r_joinStr))
+                                {
+                                    continue;
+                                }
+                                var ReplaceStr = "";
+                                bool isKey = false;
+                                var findkv = WordTableConfigHelper.GetCellReplaceItemConfig().Where(c => c.Key == item || c.Value == item).FirstOrDefault();
+                                if (findkv.Key == item)
+                                {
+                                    //年末余额递延所得税资产和负债年末互抵金额
+                                    //年初余额(已重述)递延所得税资产和负债年末互抵金额
+                                    isKey = true;
+                                    ReplaceStr = joinStr.Replace(findkv.Key, findkv.Value);
+                                }
+                                else if (findkv.Value == item)
+                                {
+                                    isKey = false;
+                                    ReplaceStr = joinStr.Replace(item, findkv.Key);
+                                }
+
+                                if (!string.IsNullOrEmpty(ReplaceStr))
+                                {
+                                    var isSelected = false;
+                                    foreach (var _item in dicDisturb)
+                                    {
+                                        if (useList.Any(u => u.Index == _item.Key) || _item.Value == joinStr)
+                                        {
+                                            continue;
+                                        }
+                                        var rStr = !isKey ? findkv.Key : findkv.Value;
+                                        var r_itemValue = _item.Value.Replace(rStr, "");
+                                        var r_ReplaceStr = ReplaceStr.Replace(rStr, "");
+                                        if ((r_itemValue.Length >= r_ReplaceStr.Length && r_itemValue.Contains(r_ReplaceStr))
+                                            || (r_itemValue.Length <= r_ReplaceStr.Length && r_ReplaceStr.Contains(r_itemValue))
+                                            )
+                                        {
+                                            useList.Add(new ReplaceCell
+                                            {
+                                                CellValue = _item.Value,
+                                                Index = _item.Key,
+                                                ReplaceMatchItem = !isKey ? findkv.Key : findkv.Value,
+                                                ReplaceMatchItemType = ReplaceMatchItemTypeEnum.Keyword
+                                            });
+
+                                            useList.Add(new ReplaceCell
+                                            {
+                                                CellValue = joinStr,
+                                                Index = index,
+                                                ReplaceMatchItem = isKey ? findkv.Key : findkv.Value,
+                                                ReplaceMatchItemType = ReplaceMatchItemTypeEnum.Keyword
+                                            });
+                                            isSelected = true;
+                                            break;
+                                        }
+                                    }
+                                    if (isSelected)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+
+                    if (useList.Count > 0)
+                    {
+                        foreach (var item in useList)
+                        {
+                            var r_cell = mergeHeadRowCells.Where(x => x.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Disturb && x.Index == item.Index && x.CellValue == item.CellValue).FirstOrDefault();
+                            if (r_cell != null)
+                            {
+                                r_cell.ReplaceMatchItem = item.ReplaceMatchItem;
+                                r_cell.ReplaceMatchItemType = item.ReplaceMatchItemType;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
         }
 
         /// <summary>
@@ -2536,6 +2663,7 @@ namespace WordDemo
             var maxRowNumber = table.Rows.Max(x => x.RowNumber);
             var rowCount = table.Rows.Count;
             var headMaxNumber = 0;
+
             if (table.HeadRows.Any())
             {
                 var lastrow = table.HeadRows.LastOrDefault();
@@ -2552,7 +2680,7 @@ namespace WordDemo
                     }
                 }
             }
-            var row = table.Rows.Where(r => r.RowCells.Any(x => x.StartColumnIndex != 1 && !Regex.IsMatch(x.OldValue, @"(\d{1,3},\d+)+|\d{1,3}") && (x.OldValue.Trim().Equals("人民币") || x.OldValue.Trim().Equals("折合人民币元") || x.OldValue.Trim().Equals("人民币元") || x.OldValue.Trim().Equals("%") || x.OldValue.Trim().Equals("美元")))).FirstOrDefault();
+            var row = table.Rows.Where(r => r.RowCells.Any(x => x.StartColumnIndex != 1 && !Regex.IsMatch(x.OldValue, @"((\d{1,3},\d+)+)|(\b(?!\d{4,})\d+\b)") && (x.OldValue.Trim().Equals("人民币") || x.OldValue.Trim().Equals("折合人民币元") || x.OldValue.Trim().Equals("人民币元") || x.OldValue.Trim().Equals("%") || x.OldValue.Trim().Equals("美元")))).FirstOrDefault();
             if (row != null)
             {
                 if (headMaxNumber < row.RowNumber)
@@ -2678,6 +2806,8 @@ namespace WordDemo
                 }
             }
         }
+
+
 
         /// <summary>
         /// 生成制表位表格单元格新值
@@ -2898,8 +3028,7 @@ namespace WordDemo
         /// <returns></returns>
         private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables)
         {
-
-            var currentTableHeadRowContent = string.Join("", currentTable.HeadRows.SelectMany(s => s.RowCells).Select(s=>s.OldValue).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem();
+            var currentTableHeadRowContent = string.Join("", currentTable.HeadRows.SelectMany(s => s.RowCells).Select(s => s.OldValue).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem();
             var prevTableNumber = currentTable.TableNumber - 1;
             var prevTable = tables.FirstOrDefault(w => w.TableNumber == prevTableNumber);
             var prevTableHeadRowContent = string.Empty;
@@ -3416,16 +3545,14 @@ namespace WordDemo
                     }
                 }
 
-                tableHeadRowParagraphList = tableHeadRowParagraphList.Where(w => !w.IsEmptyParagraph).ToList();
-                tableDataRowParagraphList = tableDataRowParagraphList.Where(w => !w.IsEmptyParagraph).ToList();
                 var table = new WordTable()
                 {
                     TableSourceType = TableSourceTypeEnum.TabStopCompute,
                     PageNumber = paragraphs[start].PageNumber,
                     TableNumber = tableList.Count + 1,
                     IsMatchWordParagraph = true,
-                    TableContentStartParagraphNumber = tableHeadRowParagraphList!=null&&tableHeadRowParagraphList.Any()? tableHeadRowParagraphList.Min(w => w.ParagraphNumber):0,
-                    TableContentEndParagraphNumber = tableDataRowParagraphList!=null&&tableDataRowParagraphList.Any()? tableDataRowParagraphList.Max(w => w.ParagraphNumber):0
+                    TableContentStartParagraphNumber = tableHeadRowParagraphList.Where(w => !w.IsEmptyParagraph).Min(w => w.ParagraphNumber),
+                    TableContentEndParagraphNumber = tableDataRowParagraphList.Where(w => !w.IsEmptyParagraph).Max(w => w.ParagraphNumber)
                 };
                 foreach (WordParagraph para in tableHeadRowParagraphList)
                 {
@@ -3433,6 +3560,8 @@ namespace WordDemo
                     {
                         continue;
                     }
+                    //var paraSplitResults=para.OldText.StartsWith("\t")? para.OldText.Remove(0,1).TrimEnd('\r').Split('\t')
+                    //    :para.OldText.TrimEnd('\r').Split('\t');
                     var paraSplitResults = para.OldText.TrimEnd('\r').Split('\t');
                     var tableRow = new WordTableRow
                     {
@@ -3505,7 +3634,7 @@ namespace WordDemo
                 var row = table.Rows[i];
                 if (new string[] { "人民币", "人民币元" }.Any(w => row.RowContent.Contains(w))
                     && row.RowCells.Where(x => x.StartColumnIndex != 1 && x.OldValue != null)
-                    .Any(x => Regex.IsMatch(x.OldValue, "人民币|人民币元") && !Regex.IsMatch(x.OldValue, @"(\d{1,3},\d+)+|\d{1,3}")))
+                    .Any(x => Regex.IsMatch(x.OldValue, "人民币|人民币元") && !Regex.IsMatch(x.OldValue, @"((\d{1,3},\d+)+)|(\b(?!\d{4,})\d+\b)")))
                 {
                     tableHeadRowEndRowIndexList.Add(i);
                 }
@@ -3520,6 +3649,12 @@ namespace WordDemo
                     {
                         var prevRow = table.Rows[i - 1];
                         var nextRow = table.Rows[i + 1];
+
+                        var isNextRowNum = prevRow.RowCells.Where(x => x.StartColumnIndex != 1 && !string.IsNullOrWhiteSpace(x.OldValue)).Any(x => Regex.IsMatch(x.OldValue, @"((\d{1,3},\d+)+)|(\b(?!\d{4,})\d+\b)"));
+                        if (isNextRowNum)
+                        {
+                            break;
+                        }
                         if (!string.IsNullOrWhiteSpace(prevRow.RowContent.Trim()) && !string.IsNullOrWhiteSpace(nextRow.RowContent.Trim()))
                         {
                             tableHeadRowEndRowIndexList.Add(i - 1);
@@ -3578,7 +3713,7 @@ namespace WordDemo
                 {
                     var row = table.Rows[r];
                     //如果在表头范围内包含标题 跳过
-                    if (r<=tableHeadEndIndex&& !string.IsNullOrWhiteSpace(row.RowContent.MatchWordTitle()))
+                    if (r <= tableHeadEndIndex && !string.IsNullOrWhiteSpace(row.RowContent.MatchWordTitle()))
                     {
                         continue;
                     }
@@ -3618,13 +3753,16 @@ namespace WordDemo
 
         private static bool isCurrencyRow(string[] cells)
         {
-            
             if (cells.Length <= 1)
             {
                 return false;
             }
             string rowValue = string.Join("", cells);
             return new string[] { "人民币", "人民币元" }.Any(w => rowValue.Contains(w));
+            //if (cells.Length <= 1)
+            //{
+            //    return false;
+            //}
             //else
             //{
             //    //正常情况下货币单位在最后一个单元格，但也有一些表格最后是%，向前推
@@ -3693,7 +3831,7 @@ namespace WordDemo
             //return result;
         }
 
-        private static float getIndent(Microsoft.Office.Interop.Word.Paragraph paragraph)
+        private static float getIndent(Paragraph paragraph)
         {
             /**
          * 悬挂缩进：实际缩进值为 IndentLeft - hanging 首行缩进与左缩进可以同时存在，实际缩进值为IndentLeft +
