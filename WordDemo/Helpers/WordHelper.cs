@@ -1,4 +1,5 @@
-﻿using Microsoft.Office.Interop.Word;
+﻿using DocumentFormat.OpenXml.ExtendedProperties;
+using Microsoft.Office.Interop.Word;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -22,59 +23,129 @@ namespace WordDemo
         /// 格式化表格表头和添加下划线
         /// </summary>
         /// <param name="doc"></param>
-        /// <param name="config"></param>
+        /// <param name="lineWidth">实线表格边框宽度磅数</param>
         /// <returns></returns>
-        public static void FormattingWordTableHeaderAndAppendUnderline(Document doc, FormattingWordTableConfig config)
+        public static void FormatTable(Document doc, WdLineWidth lineWidth =WdLineWidth.wdLineWidth050pt)
         {
-            var wordTableList = new List<WordTable>();
-            int tableNumber = 0;
             try
             {
+                Stopwatch watch = new Stopwatch();
+                watch.Start();
+                "开始设置Word表格单元格内容位置。。。".Console(ConsoleColor.Yellow);
+                int tableNumber = 0;
                 foreach (Table table in doc.Tables)
                 {
                     tableNumber++;
+                   
                     Cell firstCell = table.Cell(1, 1);
                     Cell lastCell = table.Range.Cells[table.Range.Cells.Count];
-                    $"第{tableNumber}个表格第1个单元格值：{firstCell.Range.Text.RemoveSpaceAndEscapeCharacter()},最后一个单元格值：{lastCell.Range.Text.RemoveSpaceAndEscapeCharacter()}".Console();
-
+                    int pageNumber = Convert.ToInt32(firstCell.Range.Information[WdInformation.wdActiveEndPageNumber]);
+              
                     var wordTable = GetWordTable(table);
-                    int headRowStartIndex = wordTable.HeadRows.Min(m => m.RowNumber);
-                    int headRowEndIndex = wordTable.HeadRows.Max(m => m.RowNumber);
-
-                    var firstCellBorderList = new List<Border> {
-                       firstCell.Range.Borders[WdBorderType.wdBorderTop],
-                       firstCell.Range.Borders[WdBorderType.wdBorderLeft],
-                       firstCell.Range.Borders[WdBorderType.wdBorderRight]
-                    };
-                    var lastCellBorderList = new List<Border> {
-                        lastCell.Range.Borders[WdBorderType.wdBorderTop],
-                        lastCell.Range.Borders[WdBorderType.wdBorderLeft],
-                        lastCell.Range.Borders[WdBorderType.wdBorderRight]
-                    };
-                    var solidLineBorderList = new WdLineStyle[] {
-                      WdLineStyle.wdLineStyleSingle,//单实线
-                      WdLineStyle.wdLineStyleDouble,//双实线
-                      WdLineStyle.wdLineStyleTriple,//三条细实线
-                      WdLineStyle.wdLineStyleThinThickSmallGap,WdLineStyle.wdLineStyleThickThinSmallGap,
-                      WdLineStyle.wdLineStyleThinThickThinSmallGap,WdLineStyle.wdLineStyleThinThickMedGap,
-                      WdLineStyle.wdLineStyleThickThinMedGap,WdLineStyle.wdLineStyleThinThickThinMedGap,
-                      WdLineStyle.wdLineStyleThinThickLargeGap,WdLineStyle.wdLineStyleThickThinLargeGap,
-                      WdLineStyle.wdLineStyleThinThickThinLargeGap,
-                      WdLineStyle.wdLineStyleSingleWavy,//波浪单实线
-                      WdLineStyle.wdLineStyleDoubleWavy,//波浪双实线
-                    };
-
-                    //如果第一个单元格和最后一个单元格任意一个的上左右边框线都是实线 代表表格是实线
-                    if (firstCellBorderList.All(w => solidLineBorderList.Contains(w.LineStyle)) ||
-                       lastCellBorderList.All(w => solidLineBorderList.Contains(w.LineStyle)))
+                    if(wordTable==null)
                     {
-
+                        continue;
                     }
-                    else
+
+                    var firstCellBorderList = new List<WdLineStyle> {
+                       firstCell.Range.Borders[WdBorderType.wdBorderTop].LineStyle,
+                       firstCell.Range.Borders[WdBorderType.wdBorderLeft].LineStyle,
+                       firstCell.Range.Borders[WdBorderType.wdBorderRight].LineStyle
+                    };
+                    var lastCellBorderList = new List<WdLineStyle> {
+                        lastCell.Range.Borders[WdBorderType.wdBorderTop].LineStyle,
+                        lastCell.Range.Borders[WdBorderType.wdBorderLeft].LineStyle,
+                        lastCell.Range.Borders[WdBorderType.wdBorderRight].LineStyle
+                    };
+
+                    int headRowEndIndex = wordTable.HeadRows.Max(m => m.RowNumber);
+                    int lastRowIndex= table.Range.Cells[table.Range.Cells.Count].RowIndex;
+                    int lastRowPrevRowIndex = lastRowIndex > 1 ? lastRowIndex - 1 : lastRowIndex;
+
+                    //如果表格第一个单元格和最后一个单元格的上 左 右都不是无边框，算作实线表格
+                    bool isSolidLineBorderTable = firstCellBorderList.Any(w => w!=WdLineStyle.wdLineStyleNone) ||
+                           lastCellBorderList.Any(w => w!=WdLineStyle.wdLineStyleNone);
+                    string tableBorderType = isSolidLineBorderTable ? "实线表格" : "虚线表格";
+                    $"第{pageNumber}页第{tableNumber}个表格({tableBorderType})第一行数据：{wordTable.FirstRowContent},最后一行数据：{wordTable.LastRowContent}".Console(ConsoleColor.Blue);
+                    $"第一个单元格(上边框线：{firstCellBorderList[0]},左边框线：{firstCellBorderList[1]},右边框线：{firstCellBorderList[2]})".Console(ConsoleColor.Yellow);
+                    $"最后一个单元格(上边框线：{lastCellBorderList[0]},左边框线：{lastCellBorderList[1]},右边框线：{lastCellBorderList[2]})".Console(ConsoleColor.Yellow);
+                    int cellNumber = 0;
+                    foreach (Cell cell in table.Range.Cells)
                     {
-                        //按照虚线表格处理
+                        cellNumber++;
+                        if (isSolidLineBorderTable)
+                        {
+                            //实线表格
+                            //表头：横向居中 纵向居中；数据行：横向居右 纵向居中
+                            //统一设置表格边框磅值 如0.5磅
+                            if (cell.RowIndex <= headRowEndIndex)
+                            {
+                                cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphCenter;
+                            }
+                            else
+                            {
+                                cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphRight;
+                            }
+                            cell.VerticalAlignment = WdCellVerticalAlignment.wdCellAlignVerticalCenter;
+
+                            int borderNumber = 0;
+                            foreach(Border border in cell.Borders)
+                            {
+                                borderNumber++;
+                                $"开始设置第{pageNumber}页第{tableNumber}个表第{cellNumber}个单元格第{borderNumber}个边框宽度".Console(ConsoleColor.Yellow);
+                                try
+                                {
+                                    if (border.LineStyle != WdLineStyle.wdLineStyleNone)
+                                    {
+
+                                        border.LineWidth = lineWidth;
+                                    }
+                                }
+                                catch(Exception ex)
+                                {
+                                    $"设置第{pageNumber}页第{tableNumber}个表第{cellNumber}个单元格第{borderNumber}个边框宽度异常,{ex.Message}".Console(ConsoleColor.Yellow);
+                                }
+                              
+                            }
+
+
+                        }
+                        else
+                        {
+                            //虚线表格
+                            //表头：横向居中 纵向居下；数据行：横向居右 纵向居下
+                            //表格最后一行加双下划线 倒数第二行加单下划线（下划线宽度等于列宽）
+                            if (cell.RowIndex <= headRowEndIndex)
+                            {
+                                cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphCenter;
+                            }
+                            else
+                            {
+                                cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphRight;
+                            }
+                            cell.VerticalAlignment = WdCellVerticalAlignment.wdCellAlignVerticalBottom;
+
+                            //设置虚线表格单元格下划线
+                            if(cell.RowIndex>headRowEndIndex)
+                            {
+                                if (cell.RowIndex == lastRowIndex)
+                                {
+                                    cell.Range.ParagraphFormat.Borders[WdBorderType.wdBorderBottom].LineStyle = WdLineStyle.wdLineStyleDouble;
+
+                                }
+                                if (cell.RowIndex == lastRowPrevRowIndex)
+                                {
+                                    cell.Range.ParagraphFormat.Borders[WdBorderType.wdBorderBottom].LineStyle = WdLineStyle.wdLineStyleSingle;
+
+                                }
+                            }
+                           
+                        }
                     }
                 }
+                watch.Stop();
+                $"设置Word表格单元格内容位置完成,耗时：{watch.ElapsedMilliseconds / 1000}毫秒".Console(ConsoleColor.Yellow);
+
 
             }
             catch (Exception ex)
@@ -82,7 +153,7 @@ namespace WordDemo
                 $"格式化异常,{ex.Message}".Console(ConsoleColor.Red);
             }
 
-            //cell.Range.ParagraphFormat.Alignment = WdParagraphAlignment.wdAlignParagraphCenter;
+            
         }
 
         /// <summary>
@@ -667,7 +738,7 @@ namespace WordDemo
                 var _paragraph = wordTable.Range.Paragraphs.First;
                 wdActiveEndPageNumber = Convert.ToInt32(_paragraph.Range.Information[WdInformation.wdActiveEndPageNumber]);
 
-                var table = new WordTable();
+                var table = new WordTable() { PageNumber= wdActiveEndPageNumber };
                 string tableXml = wordTable.Range.WordOpenXML;
                 XDocument document = XDocument.Parse(tableXml);
                 var rows = document.Root.Descendants().Where(f => f.Name.LocalName == "tr").ToList();
@@ -1165,7 +1236,8 @@ namespace WordDemo
                 {
                     $"第{forNumber}次循环获取第{tableParagraphList.FirstOrDefault().PageNumber}页连续按段落制表位表格失败，{ex.Message}".Console(ConsoleColor.Red);
                 }
-
+               
+                
             }
 
             foreach (var table in identifyFailTabStopTableList)

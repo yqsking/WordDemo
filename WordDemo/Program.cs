@@ -24,15 +24,15 @@ namespace WordDemo
         static void Main(string[] args)
         {
 
-            GetOcrTableCellReplaceRule();
+            //GetOcrTableCellReplaceRule();
 
-            //FormattingWord(new FormattingWordTableConfig
-            //{
-            //    SolidLineBorderTableHorizontalPositionType = HorizontalPositionTypeEnum.Center,
-            //    SolidLineBorderTableVerticalPositionTypeEnum = VerticalPositionTypeEnum.Center,
-            //    OtherHorizontalPositionType = HorizontalPositionTypeEnum.Center,
-            //    OtherVerticalPositionTypeEnum = VerticalPositionTypeEnum.Top
-            //});
+            FormattingWord(new FormattingWordTableConfig
+            {
+                SolidLineBorderTableHorizontalPositionType = HorizontalPositionTypeEnum.Center,
+                SolidLineBorderTableVerticalPositionTypeEnum = VerticalPositionTypeEnum.Center,
+                OtherHorizontalPositionType = HorizontalPositionTypeEnum.Center,
+                OtherVerticalPositionTypeEnum = VerticalPositionTypeEnum.Top
+            });
         }
 
       
@@ -249,13 +249,19 @@ namespace WordDemo
         private static void FormattingWord(FormattingWordTableConfig config)
         {
             string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            string wordFileName= Path.GetFileName(wordPath);
+            var wordFileNameSplitResults = wordFileName.Split('.');
+            string newWordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{wordFileNameSplitResults.FirstOrDefault()}_格式化后.{wordFileNameSplitResults.LastOrDefault()}");
+            File.Copy(wordPath, newWordPath, true);
+
             var wordTables = new List<WordTable>();
             Application wordApp = new Application();
-            Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
+            Document doc = wordApp.Documents.Open(newWordPath, ReadOnly: false, Visible: true);
             doc.Activate();
+            wordApp.Visible = true;
             try
             {
-                WordHelper.FormattingWordTableHeaderAndAppendUnderline(doc, config);
+                WordHelper.FormatTable(doc,WdLineWidth.wdLineWidth300pt);
 
             }
             catch (Exception ex)
