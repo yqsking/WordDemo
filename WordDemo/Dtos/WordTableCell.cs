@@ -1,5 +1,7 @@
 ﻿using Microsoft.Office.Interop.Word;
 using System.Collections.Generic;
+using System.Reflection.Emit;
+using WordDemo.Enums;
 using WordDemo.Models;
 
 namespace WordDemo
@@ -20,9 +22,9 @@ namespace WordDemo
         public string NewValue { get; set; }
 
         /// <summary>
-        /// 是否替换值
+        /// 操作类型
         /// </summary>
-        public bool IsReplaceValue { get; set; } = false;
+        public OperationTypeEnum OperationType { get; set; } = OperationTypeEnum.NotOperation;
 
         /// <summary>
         /// 单元格所在word中的范围

@@ -23,11 +23,7 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
-            string str = "年初数（已重述）";
-            Match matchResult= Regex.Match(str, "(\\(.+\\))|(（.+）)");
-            matchResult.Value.Console();
-
-            //GetOcrTableCellReplaceRule();
+            GetOcrTableCellReplaceRule();
 
             //FormattingWord();
         }
@@ -65,14 +61,18 @@ namespace WordDemo
             //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.json");
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.pdf");
 
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.pdf");
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.docx");
+            //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.json");
+            //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/可功科技.pdf");
+
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/杭州萤石网络股份有限公司.pdf");
 
             string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
-            //string pdfJson = File.ReadAllText(jsonPath);
-            string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
+            string pdfJson = File.ReadAllText(jsonPath);
+            //string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
             //return wordTables;
             Application wordApp = new Application();
             Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);

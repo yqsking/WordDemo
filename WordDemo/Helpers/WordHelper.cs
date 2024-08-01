@@ -1591,7 +1591,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = "";
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                             foreach (var cell in nextMatchItemColumnCellList)
                             {
@@ -1603,7 +1603,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = currentMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
 
                         }
@@ -1620,7 +1620,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = "";
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                             foreach (var cell in currentMatchItemColumnCellList)
                             {
@@ -1632,7 +1632,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = nextMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
 
                         }
@@ -1663,7 +1663,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
                                     cell.NewValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                             else
@@ -1671,7 +1671,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cell.OldValue))
                                 {
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -1692,7 +1692,7 @@ namespace WordDemo
                                     if (!string.IsNullOrWhiteSpace(cellDateString))
                                     {
                                         cell.NewValue = GetNextMaxDateHeadCellValue(replaceCellGroupResultList, cell.OldValue);
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
                                 }
                                 else
@@ -1701,7 +1701,7 @@ namespace WordDemo
                                     if (cell.OldValue != newValue)
                                     {
                                         cell.NewValue = newValue;
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
                                 }
 
@@ -1751,7 +1751,7 @@ namespace WordDemo
                                 if (!cell.IsHeadColumn)
                                 {
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
 
                             }
@@ -1760,7 +1760,7 @@ namespace WordDemo
                                 if (!cell.IsHeadColumn)
                                 {
                                     cell.NewValue = currentMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
 
@@ -1773,7 +1773,7 @@ namespace WordDemo
                                 if (!cell.IsHeadColumn)
                                 {
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                             foreach (var cell in currentMatchItemColumnCellList)
@@ -1781,7 +1781,7 @@ namespace WordDemo
                                 if (!cell.IsHeadColumn)
                                 {
                                     cell.NewValue = nextMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -1843,7 +1843,7 @@ namespace WordDemo
                                         continue;
                                     }
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                                 foreach (var cell in matchValueColumnCellList)
                                 {
@@ -1859,7 +1859,7 @@ namespace WordDemo
                                         continue;
                                     }
                                     cell.NewValue = dataSourceCell?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                                 alreadyReplaceMatchItemList.Add($"{keyReplaceCell.Index}_{valueReplaceCell.Index}");
                             }
@@ -1912,7 +1912,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = "";
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                             foreach (var cell in currentMatchItemRowCellList)
                             {
@@ -1924,7 +1924,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = nextMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
 
                         }
@@ -1941,7 +1941,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = "";
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                             foreach (var cell in nextMatchItemRowCellList)
                             {
@@ -1953,7 +1953,7 @@ namespace WordDemo
                                 {
                                     cell.NewValue = currentMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                         }
                         //下一行已经替换 跳过循环
@@ -1988,7 +1988,7 @@ namespace WordDemo
                             {
                                 cell.NewValue = "";
                             }
-                            cell.IsReplaceValue = true;
+                            cell.OperationType = OperationTypeEnum.ReplaceText;
                         };
 
                         //其他行 依次从上一个匹配项取值
@@ -2011,7 +2011,7 @@ namespace WordDemo
                                     cell.NewValue = prevMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
 
                                 }
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             };
                         }
 
@@ -2056,7 +2056,7 @@ namespace WordDemo
                                 if (cell.StartColumnIndex > 1)
                                 {
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
 
                             }
@@ -2065,7 +2065,7 @@ namespace WordDemo
                                 if (cell.StartColumnIndex > 1)
                                 {
                                     cell.NewValue = currentMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
 
@@ -2079,7 +2079,7 @@ namespace WordDemo
                                 if (cell.StartColumnIndex > 1)
                                 {
                                     cell.NewValue = "";
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                             foreach (var cell in currentMatchItemRowCellList)
@@ -2087,7 +2087,7 @@ namespace WordDemo
                                 if (cell.StartColumnIndex > 1)
                                 {
                                     cell.NewValue = nextMatchItemRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2121,7 +2121,7 @@ namespace WordDemo
                                     if (cell.StartColumnIndex > 1)
                                     {
                                         cell.NewValue = "";
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
                                 }
                                 foreach (var cell in matchValueRowCellList)
@@ -2129,7 +2129,7 @@ namespace WordDemo
                                     if (cell.StartColumnIndex > 1)
                                     {
                                         cell.NewValue = matchKeyRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
                                 }
                                 //alreadyReplaceMatchItems.Add(keyReplaceCell.ReplaceMatchItem + "_" + valueReplaceCell.ReplaceMatchItem);
@@ -2183,7 +2183,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
                                     cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2201,7 +2201,7 @@ namespace WordDemo
                                     if (!string.IsNullOrWhiteSpace(cell.OldValue))
                                     {
                                         cell.NewValue = "";
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
 
                                 }
@@ -2220,7 +2220,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
                                     cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2242,7 +2242,7 @@ namespace WordDemo
                                         if (cell.OldValue != newCellValue)
                                         {
                                             cell.NewValue = newCellValue;
-                                            cell.IsReplaceValue = true;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
                                         }
 
                                     }
@@ -2268,7 +2268,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
                                     cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2285,7 +2285,7 @@ namespace WordDemo
                                     if (!string.IsNullOrWhiteSpace(cell.OldValue))
                                     {
                                         cell.NewValue = "";
-                                        cell.IsReplaceValue = true;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
 
                                 }
@@ -2304,7 +2304,7 @@ namespace WordDemo
                                 if (!string.IsNullOrWhiteSpace(cellDateString))
                                 {
                                     cell.NewValue = GetNextMaxDateHeadCellValue(new List<ReplaceCell> { currentTableDateReplaceMatchItems.FirstOrDefault(), nextTableDateReplaceMatchItems.FirstOrDefault() }, cell.OldValue);
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2325,7 +2325,7 @@ namespace WordDemo
                                         if (cell.OldValue != newCellValue)
                                         {
                                             cell.NewValue = newCellValue;
-                                            cell.IsReplaceValue = true;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
                                         }
 
                                     }
@@ -2363,7 +2363,7 @@ namespace WordDemo
                             foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                             {
                                 cell.NewValue = "";
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                         }
                     }
@@ -2381,7 +2381,7 @@ namespace WordDemo
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
                                     cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
 
@@ -2404,7 +2404,7 @@ namespace WordDemo
                             foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                             {
                                 cell.NewValue = "";
-                                cell.IsReplaceValue = true;
+                                cell.OperationType = OperationTypeEnum.ReplaceText;
                             }
                         }
                     }
@@ -2422,7 +2422,7 @@ namespace WordDemo
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
                                     cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.IsReplaceValue = true;
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                             }
                         }
@@ -2779,7 +2779,7 @@ namespace WordDemo
             {
                 table.OperationType = OperationTypeEnum.ChangeColor;
             }
-            else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.IsReplaceValue)).Any())
+            else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.OperationType==OperationTypeEnum.ReplaceText)).Any())
             {
                 table.OperationType = OperationTypeEnum.ChangeColor;
             }
@@ -2899,6 +2899,7 @@ namespace WordDemo
                              && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
                             var nextTableHorizontalDateReplaceMatchItemGroupCount = nextTableHorizontalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
+                            horizontalKeywordReplaceMatchItemGroupCount = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem) && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count();
                             var nextTableHorizontalKeywordReplaceMatchItemList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                               && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                             var nextTableHorizontalKeywordReplaceMatchItemGroupCount = nextTableHorizontalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
@@ -2906,7 +2907,7 @@ namespace WordDemo
                             string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
                             string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
 
-                            string currentTableFirstReplaceMatchItem = horizontalKeywordReplaceMatchItemList.FirstOrDefault()?.ReplaceMatchItem;
+                            string currentTableFirstReplaceMatchItem = horizontalHeadRowCellList.Where(w=>!string.IsNullOrWhiteSpace(w.ReplaceMatchItem)&&w.ReplaceMatchItemType==ReplaceMatchItemTypeEnum.Keyword).FirstOrDefault()?.ReplaceMatchItem;
                             string nextTableFirstReplaceMatchItem = nextTableHorizontalKeywordReplaceMatchItemList.FirstOrDefault()?.ReplaceMatchItem;
                             bool isKeyValuePair = !string.IsNullOrWhiteSpace(currentTableFirstReplaceMatchItem) && !string.IsNullOrWhiteSpace(nextTableFirstReplaceMatchItem)
                                 && replaceItemList.Count(w => (w.Key == currentTableFirstReplaceMatchItem && w.Value == nextTableFirstReplaceMatchItem) ||
@@ -3085,6 +3086,7 @@ namespace WordDemo
                                  && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).ToList();
                                 var nextTableHorizontalDateReplaceMatchItemGroupCount = nextTableHorizontalDateReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
 
+                                horizontalKeywordReplaceMatchItemGroupCount = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem) && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).GroupBy(g => g.ReplaceMatchItem).Count();
                                 var nextTableHorizontalKeywordReplaceMatchItemList = nextTableHorizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
                                   && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                                 var nextTableHorizontalKeywordReplaceMatchItemGroupCount = nextTableHorizontalKeywordReplaceMatchItemList.GroupBy(g => g.ReplaceMatchItem).Count();
@@ -3092,7 +3094,7 @@ namespace WordDemo
                                 string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
                                 string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
 
-                                string currentTableFirstReplaceMatchItem = horizontalKeywordReplaceMatchItemList.FirstOrDefault()?.ReplaceMatchItem;
+                                string currentTableFirstReplaceMatchItem = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem) && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).FirstOrDefault()?.ReplaceMatchItem;
                                 string nextTableFirstReplaceMatchItem = nextTableHorizontalKeywordReplaceMatchItemList.FirstOrDefault()?.ReplaceMatchItem;
                                 bool isKeyValuePair = !string.IsNullOrWhiteSpace(currentTableFirstReplaceMatchItem) && !string.IsNullOrWhiteSpace(nextTableFirstReplaceMatchItem)
                                     && replaceItemList.Count(w => (w.Key == currentTableFirstReplaceMatchItem && w.Value == nextTableFirstReplaceMatchItem) ||
@@ -3384,7 +3386,7 @@ namespace WordDemo
                                         ChilderCells = subCell.ChilderCells,
                                         ColSpan = subCell.ColSpan,
                                         IsHeadColumn = false,
-                                        IsReplaceValue = subCell.IsReplaceValue,
+                                        OperationType = subCell.OperationType,
                                         Length = subCell.Length,
                                         MinX = subCell.MinX,
                                         MinY = subCell.MinY,
