@@ -2917,6 +2917,8 @@ namespace WordDemo
                                 && ((horizontalDateReplaceMatchItemGroupCount == 1 && nextTableHorizontalDateReplaceMatchItemGroupCount == 1)//上下两个表都有一个日期匹配项
                                 || (horizontalKeywordReplaceMatchItemGroupCount == 1 && nextTableHorizontalKeywordReplaceMatchItemGroupCount == 1 && isKeyValuePair))) //上下两个表都有一个关键字匹配项，且是一堆键值对
                             {
+                                horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                                && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                                 //执行跨表替换逻辑
                                 CrossTableReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList,
                                     nextTable, nextTableHorizontalDateReplaceMatchItemList, nextTableHorizontalKeywordReplaceMatchItemList);
@@ -3104,6 +3106,8 @@ namespace WordDemo
                                     && ((horizontalDateReplaceMatchItemGroupCount == 1 && nextTableHorizontalDateReplaceMatchItemGroupCount == 1)//上下两个表都有一个日期匹配项
                                     || (horizontalKeywordReplaceMatchItemGroupCount == 1 && nextTableHorizontalKeywordReplaceMatchItemGroupCount == 1 && isKeyValuePair))) //上下两个表都有一个关键字匹配项，且是一堆键值对
                                 {
+                                    horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
+                                     && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                                     //执行跨表替换逻辑
                                     CrossTableReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList,
                                         nextTable, nextTableHorizontalDateReplaceMatchItemList, nextTableHorizontalKeywordReplaceMatchItemList);
@@ -3145,6 +3149,74 @@ namespace WordDemo
         #endregion
 
         #region Common
+
+        /// <summary>
+        /// 检测表格数据行第一列是否需要标黄
+        /// </summary>
+        /// <param name="wordTable"></param>
+        private static void CheckTableDateRowFirstColumnIsChangeColor(WordTable wordTable)
+        {
+            var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
+            var dataRowFirstColumnCellList = wordTable.DataRowFirstColumnCells;
+            var needChangeColorRowNumberList = new List<int>();
+            if (dataRowFirstColumnCellList.Any())
+            {
+                for (int i = 0; i < dataRowFirstColumnCellList.Count; i++)
+                {
+                    var currentFirstColumnCell = dataRowFirstColumnCellList[i];
+                    var cellReplaceItemList = currentFirstColumnCell.OldValue.GetAllReplaceItemList();
+                    if (!cellReplaceItemList.Any())
+                    {
+                        continue;
+                    }
+                    if (cellReplaceItemList.Count >= 2)
+                    {
+                        if (replaceItemList.Any(w => cellReplaceItemList.Contains(w.Key) && cellReplaceItemList.Contains(w.Value)))
+                        {
+                            //任意一组关键字存在于当前单元格关键字匹配项中 代表需要标黄
+                            needChangeColorRowNumberList.Add(currentFirstColumnCell.StartRowIndex);
+                        }
+
+                    }
+                    else
+                    {
+                        //制表位表格 单元格匹配到一个替换项 
+                        if (wordTable.IsTabStopTable)
+                        {
+                            WordTableCell nextRowFirstColumnCell = null;
+                            if (i < dataRowFirstColumnCellList.Count - 1)
+                            {
+                                nextRowFirstColumnCell = dataRowFirstColumnCellList[i + 1];
+                            }
+
+                            if (nextRowFirstColumnCell != null)
+                            {
+                                //当前单元格与下一行单元格合并内容 如果包含一对键值对关键字 且包含"和"或者"及" 当前单元格所在行和下一行都标黄
+                                string mergeCellOldValue = string.Join("", new string[] { currentFirstColumnCell.OldValue, nextRowFirstColumnCell.OldValue });
+                                var mergeCellReplaceItemList = mergeCellOldValue.GetAllReplaceItemList();
+                                if (mergeCellReplaceItemList.Count >= 2 && new string[] { "和", "及" }.Any(w => mergeCellOldValue.Contains(w)) && replaceItemList.Any(w => mergeCellOldValue.Contains(w.Key) && mergeCellOldValue.Contains(w.Value)))
+                                {
+                                    needChangeColorRowNumberList.AddRange(new int[] {
+                                       currentFirstColumnCell.StartRowIndex,nextRowFirstColumnCell.StartRowIndex
+                                    });
+
+                                    //跳过下一行
+                                    i++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (var rowNumber in needChangeColorRowNumberList)
+            {
+                wordTable.Rows.FirstOrDefault(w => w.RowNumber == rowNumber).RowCells.ForEach(f => {
+                    f.OperationType = OperationTypeEnum.ChangeColor;
+                });
+            }
+        }
+
         /// <summary>
         /// 获取word的所有段落和正常表格
         /// </summary>

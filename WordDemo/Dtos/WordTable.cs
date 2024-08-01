@@ -112,10 +112,16 @@ namespace WordDemo
         public Range TableRange { get; set; }
 
         /// <summary>
+        /// 数据行第一列单元格
+        /// </summary>
+        public List<WordTableCell> DataRowFirstColumnCells => DataRows.SelectMany(s => s.RowCells)
+            .Where(w => w.StartColumnIndex == 1).OrderBy(o => o.StartRowIndex).ToList();
+
+        /// <summary>
         /// 数据行第一列内容
         /// </summary>
-        public string DateRowFirstColumnContent => DataRows.Any() ? string.Join("", DataRows.SelectMany(s => s.RowCells).Where(w => w.StartColumnIndex == 1)
-            .OrderBy(o => o.StartRowIndex).Select(s => s.OldValue.RemoveWordTitle()).ToList()) : "";
+        public string DateRowFirstColumnContent => DataRowFirstColumnCells.Any() ?
+            string.Join("", DataRowFirstColumnCells.Select(s => s.OldValue)) : "";
 
     }
 }
