@@ -9,6 +9,7 @@ namespace System
     public static class StringHelper
     {
 
+
         /// <summary>
         /// 转半角字符
         /// </summary>
@@ -55,7 +56,8 @@ namespace System
         /// <returns></returns>
         public static List<string> SplitByChar(this string str)
         {
-            var strChars = str.ToList().Select(s => new {
+            var strChars = str.ToList().Select(s => new
+            {
                 Text = s.ToString(),
                 IsNumber = Regex.IsMatch(s.ToString(), @"^-?\d+(\.\d+)?$")
             })
@@ -92,12 +94,18 @@ namespace System
         public static string GetDateString(this string str)
         {
             var dateStringList = new List<string>();
-            string datePattern = @"\d{4}年\d{1,2}月\d{1,2}日";
-            string yearPattern = @"\d{4}年";
+            string datePattern = @"\d{4}\s*年\s*\d{1,2}月\s*\d{1,2}日";
+            string dateAndYearPattern = @"\d{4}\s*年\s*\d{1,2}月";
+            string yearPattern = @"\d{4}\s*年";
             var matchResult = Regex.Match(str, datePattern);
+            var match_dateAndYearResult = Regex.Match(str, dateAndYearPattern);
             if (matchResult.Success)
             {
                 return matchResult.Value;
+            }
+            else if (match_dateAndYearResult.Success)
+            {
+                return match_dateAndYearResult.Value;
             }
             else
             {
@@ -117,23 +125,23 @@ namespace System
             var matchReplaceItemList = new List<string>();
             string datePattern = @"\d{4}年\d{1,2}月\d{1,2}日";
             string yearPattern = @"\d{4}年";
-            string keyvaluePattern =string.Join("|" ,WordTableConfigHelper.GetCellReplaceItemConfig().SelectMany(s => new[] { s.Key, s.Value }).Distinct().ToList());
-            var dateMatchResults= Regex.Matches(str,datePattern);
-            foreach(Match dateMatchResult in dateMatchResults)
+            string keyvaluePattern = string.Join("|", WordTableConfigHelper.GetCellReplaceItemConfig().SelectMany(s => new[] { s.Key, s.Value }).Distinct().ToList());
+            var dateMatchResults = Regex.Matches(str, datePattern);
+            foreach (Match dateMatchResult in dateMatchResults)
             {
                 matchReplaceItemList.Add(dateMatchResult.Value);
             }
-            if(dateMatchResults.Count<=0)
+            if (dateMatchResults.Count <= 0)
             {
-                var yearMatchResults=Regex.Matches(str, yearPattern);
-                foreach(Match yearMatchResult in yearMatchResults)
+                var yearMatchResults = Regex.Matches(str, yearPattern);
+                foreach (Match yearMatchResult in yearMatchResults)
                 {
                     matchReplaceItemList.Add(yearMatchResult.Value);
                 }
             }
 
-            var keyvalueMatchResults=Regex.Matches(str, keyvaluePattern);
-            foreach(Match keyvalueMatchResult in keyvalueMatchResults)
+            var keyvalueMatchResults = Regex.Matches(str, keyvaluePattern);
+            foreach (Match keyvalueMatchResult in keyvalueMatchResults)
             {
                 matchReplaceItemList.Add(keyvalueMatchResult.Value);
             }
@@ -147,10 +155,10 @@ namespace System
         /// <returns></returns>
         public static string ReplaceAllReplaceItem(this string str)
         {
-            var allReplaceItemList= str.GetAllReplaceItemList();
-            if(allReplaceItemList.Any())
+            var allReplaceItemList = str.GetAllReplaceItemList();
+            if (allReplaceItemList.Any())
             {
-                foreach(var replaceItem in allReplaceItemList)
+                foreach (var replaceItem in allReplaceItemList)
                 {
                     str = str.Replace(replaceItem, "");
                 }
@@ -177,7 +185,7 @@ namespace System
         /// <param name="str"></param>
         /// <param name="isContaintTabStop">标题中是否包含\t</param>
         /// <returns></returns>
-        public static string MatchWordTitle(this string str,bool isContaintTabStop=false)
+        public static string MatchWordTitle(this string str, bool isContaintTabStop = false)
         {
             string matchTitle = "";
             //标题类型：一、 1. （1） (1) (a)（a）（ii）（ii）
@@ -269,7 +277,7 @@ namespace System
         /// <param name="str1"></param>
         /// <param name="str2"></param>
         /// <returns></returns>
-        public static string ReplaceEmpty(this string str1,string str2)
+        public static string ReplaceEmpty(this string str1, string str2)
         {
             return str1.Replace(str2, "");
         }
@@ -280,9 +288,9 @@ namespace System
         /// <param name="str1"></param>
         /// <param name="str2"></param>
         /// <returns></returns>
-        public static bool IsContains(this string str1,string str2)
+        public static bool IsContains(this string str1, string str2)
         {
-            return str1.Length>=str2.Length?Regex.IsMatch(str1,str2):Regex.IsMatch(str2,str1);
+            return str1.Length >= str2.Length ? (Regex.IsMatch(str1, str2) || str1.Contains(str2)) : (Regex.IsMatch(str2, str1) || str2.Contains(str1));
         }
 
         /// <summary>
@@ -331,14 +339,33 @@ namespace System
         /// <returns></returns>
         public static bool IsWordTableDateRow(this string rowContent)
         {
-            string dateString= rowContent.GetDateString();
-            if(!string.IsNullOrWhiteSpace(dateString))
+            string dateString = rowContent.GetDateString();
+            if (!string.IsNullOrWhiteSpace(dateString))
             {
                 rowContent = rowContent.Replace(dateString, "");
             }
             bool isContainMoney = Regex.IsMatch(rowContent, "((\\d{1,3},\\d+)+)|(\\b(?!\\d{4,})\\d+\\b)|-");
-            return  isContainMoney;
+            return isContainMoney;
         }
+
+        /// <summary>
+        /// 移除括号内容
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string RemoveBracketContent(this string str)
+        {
+            MatchCollection matchResults = Regex.Matches(str, "(\\(.+\\))|(（.+）)");
+            foreach (Match matchResult in matchResults)
+            {
+                if (matchResult.Success)
+                {
+                    str = str.Replace(matchResult.Value, "");
+                }
+            }
+            return str;
+        }
+
 
     }
 }

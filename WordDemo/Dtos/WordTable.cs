@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Office.Interop.Word;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using WordDemo.Enums;
@@ -22,41 +23,22 @@ namespace WordDemo
         /// 是否匹配到word段落
         /// </summary>
         public bool IsMatchWordParagraph { get; set; }
-      
-        /// <summary>
-        /// 表格前五条文本
-        /// </summary>
-        public List<WordLine> UpLines { get; set; }=new List<WordLine>();
 
-        /// <summary>
-        /// 过滤页眉页尾的表格前多条文本
-        /// </summary>
-        public List<WordLine> FilterUpLines => UpLines.Where(w => w != null && !string.IsNullOrWhiteSpace(w.Text) && !w.IsHeader && !w.IsFooter).ToList();
-
-        /// <summary>
-        /// 表格后五条文本
-        /// </summary>
-        public List<WordLine> DownLines { get; set; } = new List<WordLine>();
-
-        /// <summary>
-        /// 过滤页眉页尾的表格后多条文本
-        /// </summary>
-        public List<WordLine> FilterDownLines => DownLines.Where(w => w != null && !string.IsNullOrWhiteSpace(w.Text) && !w.IsHeader && !w.IsFooter).ToList();
 
         /// <summary>
         /// 表格内容开始段落
         /// </summary>
-        public int? TableContentStartParagraphNumber {  get; set; }
+        public int? TableContentStartParagraphNumber { get; set; }
 
         /// <summary>
         /// 表格内容结束段落
         /// </summary>
-        public int? TableContentEndParagraphNumber {  get; set; }
+        public int? TableContentEndParagraphNumber { get; set; }
 
         /// <summary>
         /// 表格在word的段落
         /// </summary>
-        public List<WordParagraph> ContentParagraphs { get; set; }= new List<WordParagraph>();
+        public List<WordParagraph> ContentParagraphs { get; set; } = new List<WordParagraph>();
 
         /// <summary>
         /// 是否制表位表格
@@ -83,7 +65,7 @@ namespace WordDemo
         /// 表格后三行内容
         /// </summary>
         public List<string> LastThreeLineTexts => Rows.Where(w => !string.IsNullOrWhiteSpace(w.RowContent)).Reverse()
-            .Take(3).OrderBy(o=>o.RowNumber).Select(s => s.RowContent).ToList();
+            .Take(3).OrderBy(o => o.RowNumber).Select(s => s.RowContent).ToList();
 
         /// <summary>
         /// 表头行
@@ -98,13 +80,13 @@ namespace WordDemo
         /// <summary>
         /// 表格第一行内容
         /// </summary>
-        public string FirstRowContent => Rows.Where(w=>!string.IsNullOrWhiteSpace(w.RowContent.RemoveSpaceAndEscapeCharacter()))
+        public string FirstRowContent => Rows.Where(w => !string.IsNullOrWhiteSpace(w.RowContent.RemoveSpaceAndEscapeCharacter()))
             .FirstOrDefault()?.RowContent;
 
         /// <summary>
         /// 表格最后一行内容
         /// </summary>
-        public string LastRowContent=>Rows.Where(w=>!string.IsNullOrWhiteSpace(w.RowContent.RemoveSpaceAndEscapeCharacter()))
+        public string LastRowContent => Rows.Where(w => !string.IsNullOrWhiteSpace(w.RowContent.RemoveSpaceAndEscapeCharacter()))
             .LastOrDefault()?.RowContent;
 
         /// <summary>
@@ -120,18 +102,20 @@ namespace WordDemo
         /// <summary>
         /// 错误消息
         /// </summary>
-        public List<string> ErrorMsgs { get; set; }= new List<string>();
+        public List<string> ErrorMsgs { get; set; } = new List<string>();
 
-       
         /// <summary>
         /// 表格来源
         /// </summary>
         public TableSourceTypeEnum TableSourceType { get; set; } = TableSourceTypeEnum.OCR;
 
+        public Range TableRange { get; set; }
+
         /// <summary>
-        /// 表格边框类型
+        /// 数据行第一列内容
         /// </summary>
-        public bool IsSolidLineBorderTable { get; set; } 
+        public string DateRowFirstColumnContent => DataRows.Any() ? string.Join("", DataRows.SelectMany(s => s.RowCells).Where(w => w.StartColumnIndex == 1)
+            .OrderBy(o => o.StartRowIndex).Select(s => s.OldValue.RemoveWordTitle()).ToList()) : "";
 
     }
 }

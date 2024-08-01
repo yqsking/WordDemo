@@ -23,16 +23,13 @@ namespace WordDemo
     {
         static void Main(string[] args)
         {
+            string str = "年初数（已重述）";
+            Match matchResult= Regex.Match(str, "(\\(.+\\))|(（.+）)");
+            matchResult.Value.Console();
 
             //GetOcrTableCellReplaceRule();
 
-            FormattingWord(new FormattingWordTableConfig
-            {
-                SolidLineBorderTableHorizontalPositionType = HorizontalPositionTypeEnum.Center,
-                SolidLineBorderTableVerticalPositionTypeEnum = VerticalPositionTypeEnum.Center,
-                OtherHorizontalPositionType = HorizontalPositionTypeEnum.Center,
-                OtherVerticalPositionTypeEnum = VerticalPositionTypeEnum.Top
-            });
+            //FormattingWord();
         }
 
       
@@ -68,14 +65,14 @@ namespace WordDemo
             //string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.json");
             //string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海汇众汽车车桥系统有限公司.pdf");
 
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海畅帆投资管理咨询服务有限公司.docx");
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海畅帆投资管理咨询服务有限公司.json");
-            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/上海畅帆投资管理咨询服务有限公司.pdf");
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.docx");
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.json");
+            string pdfPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestFiles/龙原微电子test.pdf");
 
             string jsonOutputUrl = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"TestFiles/{Path.GetFileName(wordPath).Split('.').FirstOrDefault()}.json");
 
-            string pdfJson = File.ReadAllText(jsonPath);
-            //string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
+            //string pdfJson = File.ReadAllText(jsonPath);
+            string pdfJson = GetPdfJson(pdfPath, jsonOutputUrl).GetAwaiter().GetResult();
             //return wordTables;
             Application wordApp = new Application();
             Document doc = wordApp.Documents.Open(wordPath, ReadOnly: false, Visible: false);
@@ -246,10 +243,13 @@ namespace WordDemo
         /// 格式化
         /// </summary>
         /// <param name="config"></param>
-        private static void FormattingWord(FormattingWordTableConfig config)
+        private static void FormattingWord()
         {
-            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
-            string wordFileName= Path.GetFileName(wordPath);
+            //实线虚线表格
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/招商蛇口格式_1229.docx");
+            //制表位表格
+            string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+            string wordFileName = Path.GetFileName(wordPath);
             var wordFileNameSplitResults = wordFileName.Split('.');
             string newWordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{wordFileNameSplitResults.FirstOrDefault()}_格式化后.{wordFileNameSplitResults.LastOrDefault()}");
             File.Copy(wordPath, newWordPath, true);
@@ -261,7 +261,14 @@ namespace WordDemo
             wordApp.Visible = true;
             try
             {
-                WordHelper.FormatTable(doc,WdLineWidth.wdLineWidth300pt);
+                //var tableList = new List<Table>();
+                //foreach (Table table in doc.Tables)
+                //{
+                //    tableList.Add(table);
+                //}
+                //WordHelper.FormatTable(tableList,WdLineWidth.wdLineWidth300pt);
+
+                WordHelper.FormatTable(doc);
 
             }
             catch (Exception ex)
