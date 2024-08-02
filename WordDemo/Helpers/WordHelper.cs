@@ -449,7 +449,6 @@ namespace WordDemo
                         var tableCount = table.Rows.Count;
                         if (tableRangeParagraphList.Count < tableCount)
                         {
-
                             var remove_tbIndexList = new List<int>();
 
                             var tbRowIndex = 0;
@@ -477,14 +476,26 @@ namespace WordDemo
 
                                     if (!string.IsNullOrWhiteSpace(next_t_Row.RowContent) && t_para.Text.Contains($"{t_row.RowContent.Trim()}{next_t_Row.RowContent.Trim()}"))
                                     {
-                                        var cells = next_t_Row.RowCells.Where(x => !string.IsNullOrWhiteSpace(x.OldValue));
+                                        var cells = next_t_Row.RowCells.Where(x => !string.IsNullOrWhiteSpace(x.OldValue)).ToList();
 
                                         var t_row_cells_count = t_row.RowCells.Count;
                                         var splists = t_para.OldText.Split('\t');
+                                        //基础判断 paraText 按照\t 拆分的 数组大于0 、当前行和下一行都大于0
+                                        var isRowCellCountEquals = t_row_cells_count > 0 && cells.Count() > 0 && splists != null && splists.Length > 0;
+                                        //判断 paraText 拆分的数组长度= 当前行的单元格数+ 下一行不为空的单元格数
+                                        var splistsCountEquals_t_row_cells_countAddNetxCells = isRowCellCountEquals && splists.Length == t_row_cells_count + cells.Count();
+                                        //判断 paraText 拆分的数组长度=当前行的单元格数 并且 当前单元格最后一个单元格内容为空，下一行单元格最后一个单元格内容不为空
+                                        var splistsCount_Equals_t_row_cells_count = isRowCellCountEquals && splists.Length == t_row_cells_count && !string.IsNullOrEmpty(next_t_Row.RowCells.Last().OldValue) && string.IsNullOrEmpty(t_row.RowCells.Last().OldValue);
 
-                                        if (t_row_cells_count > 0 && cells.Count() > 0 && splists != null && splists.Length > 0 && splists.Length == t_row_cells_count + cells.Count())
+                                        if (splistsCountEquals_t_row_cells_countAddNetxCells || splistsCount_Equals_t_row_cells_count)
                                         {
                                             var colIndex = t_row_cells_count;
+                                            if (splistsCount_Equals_t_row_cells_count)
+                                            {
+                                                colIndex--;
+                                                t_row.RowCells.RemoveAt(colIndex);
+
+                                            }
                                             foreach (var item in cells)
                                             {
                                                 colIndex++;
@@ -583,6 +594,7 @@ namespace WordDemo
             }
 
             Cancel.ThrowIfCancellationRequested();
+            //拆分表格
             SplitTables(tableList, errorMsg_Event);
 
 
@@ -594,14 +606,20 @@ namespace WordDemo
             });
 
             Cancel.ThrowIfCancellationRequested();
+            //检测干扰项数据行标黄
+            CheckTableDateRowFirstColumnIsChangeColor(tableList);
             //生成制表位单元格新值
             BuildTabStopTableCellNewValue(tableList, errorMsg_Event);
 
             //生成正常表格单元格新值
             if (normalTableList.Any())
             {
+                //合并表格
                 MergeTables(normalTableList, errorMsg_Event);
+                //分割表格
                 SplitTables(normalTableList, errorMsg_Event);
+                //检测干扰项数据行标黄
+                CheckTableDateRowFirstColumnIsChangeColor(normalTableList);
                 BuildNormalTableCellNewValue(normalTableList, errorMsg_Event);
                 foreach (var normalTable in normalTableList)
                 {
@@ -918,6 +936,27 @@ namespace WordDemo
                         }
                     }
                 }
+                table.Rows = temp_rowList;
+
+                //第一个单元格垂直合并数量
+                int firstCellRowSpan = table.Rows.FirstOrDefault().RowCells.FirstOrDefault().RowSpan;
+
+                var _rowIndex = 1;
+                //lxz 判断是否有【人民币元】和空行，
+                foreach (var row in table.Rows)
+                {
+                    //row.RowNumber <= firstCellRowSpan //lxz 2024-08-01 RowNumber有重复的，是上面计算是否有删除行时，重置了行号，导致重复；
+                    if (_rowIndex <= firstCellRowSpan)
+                    {
+                        foreach (var cell in row.RowCells)
+                        {
+                            cell.IsHeadColumn = true;
+                        }
+                    }
+                    _rowIndex++;
+                    //排除掉被垂直合并的单元格
+                    //row.RowCells = row.RowCells.Where(w => w.VMergeVal.ToUpper() != "Continue".ToUpper()).ToList();
+                }
 
                 if (removeRowIndexList.Any())
                 {
@@ -928,23 +967,13 @@ namespace WordDemo
                         temp_rowList.RemoveAt(idx);
                     }
                 }
-                table.Rows = temp_rowList;
 
-                //第一个单元格垂直合并数量
-                int firstCellRowSpan = table.Rows.FirstOrDefault().RowCells.FirstOrDefault().RowSpan;
-                //lxz 判断是否有【人民币元】和空行，
                 foreach (var row in table.Rows)
                 {
-                    if (row.RowNumber <= firstCellRowSpan)
-                    {
-                        foreach (var cell in row.RowCells)
-                        {
-                            cell.IsHeadColumn = true;
-                        }
-                    }
                     //排除掉被垂直合并的单元格
                     row.RowCells = row.RowCells.Where(w => w.VMergeVal.ToUpper() != "Continue".ToUpper()).ToList();
                 }
+
                 //lxz 添加判断 人名币 和 空行 认为是表头
                 SupplementRMBHeader(table);
 
@@ -1566,78 +1595,233 @@ namespace WordDemo
                 var dateReplaceMatchItemGroupList = dateReplaceMatchItems.GroupBy(g => g.ReplaceMatchItemDate).ToList();
                 if (dateReplaceMatchItems.Count % 2 == 0 && dateReplaceMatchItemGroupList.All(w => w.Count() >= 2))
                 {
-                    //日期两两一组重复出现 如：2023年 2022年 2023年 2022年
                     //匹配项数量是偶数 且匹配项存在重复 按照最近的两个匹配项为一组 
+
+                    /*
+                     * 1.日期两两一组重复出现 如：2023年 2022年 2023年 2022年
+                     * 匹配项数量是偶数 且匹配项存在重复 按照最近的两个匹配项为一组 
+                     * 
+                     *   lxz 2024-08-01
+                     * 2.日期两两出现 2023年12月31日金额 2023年12月31日比例(%)  2022年12月31日金额 2022年12月31日比例(%)
+                     * 出现上面情况是因为 日期单元格是合并单元格；
+                     */
+                    var isOnePlan = true;
+                    //检查是 第一种情况，还是第二中情况
                     for (int i = 0; i < dateReplaceMatchItems.Count; i++)
                     {
                         var currentReplaceCell = dateReplaceMatchItems[i];
                         var nextReplaceCell = dateReplaceMatchItems[i + 1];
-
-                        var currentMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceCell.Index).ToList();
-                        var nextMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == nextReplaceCell.Index).ToList();
-
-                        //判断替换方向 
-                        if (currentReplaceCell.ReplaceMatchItemDate > nextReplaceCell.ReplaceMatchItemDate)
+                        var currentReplaceStr = currentReplaceCell.CellValue.Replace(currentReplaceCell.ReplaceMatchItem, "");
+                        var nextReplaceStr = nextReplaceCell.CellValue.Replace(currentReplaceCell.ReplaceMatchItem, "");
+                        if (currentReplaceCell.ReplaceMatchItemDate > nextReplaceCell.ReplaceMatchItemDate
+                            || currentReplaceCell.ReplaceMatchItemDate < nextReplaceCell.ReplaceMatchItemDate)
                         {
-
-                            //当前日期匹配项大于下一个日期匹配项 从上往下替换
-                            foreach (var cell in currentMatchItemColumnCellList)
-                            {
-                                if (cell.IsHeadColumn)
-                                {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
-                                }
-                                else
-                                {
-                                    cell.NewValue = "";
-                                }
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
-                            }
-                            foreach (var cell in nextMatchItemColumnCellList)
-                            {
-                                if (cell.IsHeadColumn)
-                                {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
-                                }
-                                else
-                                {
-                                    cell.NewValue = currentMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                                }
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
-                            }
-
+                            isOnePlan = true;
+                            break;
                         }
+                        else if (currentReplaceCell.ReplaceMatchItemDate == nextReplaceCell.ReplaceMatchItemDate)
+                        {
+                            var currentCellValue = currentReplaceCell.CellValue;
+                            var current_dateTimeStr = currentCellValue.GetDateString();
+                            var next_dateTimeStr = nextReplaceCell.CellValue.GetDateString();
+                            if (!string.IsNullOrEmpty(currentReplaceStr) && !string.IsNullOrEmpty(current_dateTimeStr))
+                            {
+                                var current_replace_next_HeadCellValue = GetNextOrPreDateHeadCellValue(currentCellValue, true);
+                                var current_replace_pre_HeadCellValue = GetNextOrPreDateHeadCellValue(currentCellValue, false);
+                                var ischkedcell = dateReplaceMatchItems.Where(x => x.Index != currentReplaceCell.Index && (x.CellValue == current_replace_next_HeadCellValue || x.CellValue == current_replace_pre_HeadCellValue));
+                                isOnePlan = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    var alreadyReplaceMatchItemList = new List<int>();
+                    for (int i = 0; i < dateReplaceMatchItems.Count; i++)
+                    {
+                        if (alreadyReplaceMatchItemList.Contains(i))
+                        {
+                            continue;
+                        }
+                        //日期两两一组重复出现 如：2023年 2022年 2023年 2022年
+                        //匹配项数量是偶数 且匹配项存在重复 按照最近的两个匹配项为一组 
+                        var currentReplaceCell = dateReplaceMatchItems[i];
+                        if (isOnePlan)
+                        {
+                            var nextReplaceCell = dateReplaceMatchItems[i + 1];
+                            var currentMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceCell.Index).ToList();
+                            var nextMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == nextReplaceCell.Index).ToList();
+
+                            //判断替换方向 
+                            if (currentReplaceCell.ReplaceMatchItemDate > nextReplaceCell.ReplaceMatchItemDate)
+                            {
+                                //当前日期匹配项大于下一个日期匹配项 从上往下替换
+                                foreach (var cell in currentMatchItemColumnCellList)
+                                {
+                                    if (cell.IsHeadColumn)
+                                    {
+                                        var getdateString = cell.OldValue.GetDateString();
+                                        var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                        cell.NewValue = _NewcellValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
+                                    else
+                                    {
+                                        //干扰项行不清空
+                                        if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                        {
+                                            cell.NewValue = "";
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+                                    }
+
+                                }
+                                foreach (var cell in nextMatchItemColumnCellList)
+                                {
+                                    if (cell.IsHeadColumn)
+                                    {
+                                        var getdateString = cell.OldValue.GetDateString();
+                                        var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                        cell.NewValue = _NewcellValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
+                                    else
+                                    {
+                                        if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                        {
+                                            cell.NewValue = currentMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+
+                                    }
+
+                                }
+                            }
+                            else if (currentReplaceCell.ReplaceMatchItemDate < nextReplaceCell.ReplaceMatchItemDate)
+                            {
+                                //当前日期匹配项小于等于下一个日期匹配项 从下往上替换
+                                foreach (var cell in nextMatchItemColumnCellList)
+                                {
+                                    if (cell.IsHeadColumn)
+                                    {
+                                        var getdateString = cell.OldValue.GetDateString();
+                                        var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                        cell.NewValue = _NewcellValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
+                                    else
+                                    {
+                                        if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                        {
+                                            cell.NewValue = "";
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+                                    }
+
+                                }
+                                foreach (var cell in currentMatchItemColumnCellList)
+                                {
+                                    if (cell.IsHeadColumn)
+                                    {
+                                        var getdateString = cell.OldValue.GetDateString();
+                                        var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                        cell.NewValue = _NewcellValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
+                                    else
+                                    {
+                                        if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                        {
+                                            cell.NewValue = nextMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+                                    }
+
+                                }
+                            }
+                            //下一行已经替换 跳过循环
+                            i++;
+                        }//lxz 2024-08-01 添加逻辑 当两个日期相同
                         else
                         {
-                            //当前日期匹配项小于等于下一个日期匹配项 从下往上替换
-                            foreach (var cell in nextMatchItemColumnCellList)
-                            {
-                                if (cell.IsHeadColumn)
-                                {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
-                                }
-                                else
-                                {
-                                    cell.NewValue = "";
-                                }
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
-                            }
-                            foreach (var cell in currentMatchItemColumnCellList)
-                            {
-                                if (cell.IsHeadColumn)
-                                {
-                                    cell.NewValue = GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
-                                }
-                                else
-                                {
-                                    cell.NewValue = nextMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                                }
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
-                            }
+                            var currentReplaceStr = currentReplaceCell.CellValue.Replace(currentReplaceCell.ReplaceMatchItem, "");
 
+                            //var currentMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceCell.Index).ToList();
+                            //var nextMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == nextReplaceCell.Index).ToList();
+
+                            var currentCellValue = currentReplaceCell.CellValue;
+                            var current_dateTimeStr = currentCellValue.GetDateString();
+                            if (!string.IsNullOrEmpty(currentReplaceStr) && !string.IsNullOrEmpty(current_dateTimeStr))
+                            {
+                                var current_replace_next_HeadCellValue = GetNextOrPreDateHeadCellValue(currentCellValue, true);
+                                var current_replace_pre_HeadCellValue = GetNextOrPreDateHeadCellValue(currentCellValue, false);
+                                var Nextcell = dateReplaceMatchItems.Where(x => x.Index != currentReplaceCell.Index && !alreadyReplaceMatchItemList.Contains(x.Index) && x.CellValue == current_replace_next_HeadCellValue).FirstOrDefault();
+                                var Precell = dateReplaceMatchItems.Where(x => x.Index != currentReplaceCell.Index && !alreadyReplaceMatchItemList.Contains(x.Index) && x.CellValue == current_replace_pre_HeadCellValue).FirstOrDefault();
+
+                                //去年
+                                var lastYearMatchItemColumnCellList = new List<WordTableCell>();
+                                //今年
+                                var thisYarMatchItemColumnCellList = new List<WordTableCell>();
+                                var tagetIndex = -1;
+                                if (Nextcell != null)
+                                {
+                                    lastYearMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceCell.Index).ToList();
+                                    thisYarMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == Nextcell.Index).ToList();
+                                    tagetIndex = Nextcell.Index;
+                                }
+                                else if (Precell != null)
+                                {
+                                    lastYearMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == Precell.Index).ToList();
+                                    thisYarMatchItemColumnCellList = allCellList.Where(w => w.StartColumnIndex == currentReplaceCell.Index).ToList();
+                                    tagetIndex = Precell.Index;
+                                }
+                                //代表查找成功
+                                if (lastYearMatchItemColumnCellList.Any() && thisYarMatchItemColumnCellList.Any())
+                                {
+                                    foreach (var cell in thisYarMatchItemColumnCellList)
+                                    {
+                                        if (cell.IsHeadColumn)
+                                        {
+                                            var getdateString = cell.OldValue.GetDateString();
+                                            var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                            cell.NewValue = _NewcellValue;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+                                        else
+                                        {
+                                            if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                            {
+                                                cell.NewValue = "";
+                                                cell.OperationType = OperationTypeEnum.ReplaceText;
+                                            }
+                                        }
+
+                                    }
+                                    foreach (var cell in lastYearMatchItemColumnCellList)
+                                    {
+                                        if (cell.IsHeadColumn)
+                                        {
+                                            var getdateString = cell.OldValue.GetDateString();
+                                            var _NewcellValue = string.IsNullOrWhiteSpace(getdateString) ? cell.OldValue : GetNextMaxDateHeadCellValue(dateReplaceMatchItems, cell.OldValue);
+                                            cell.NewValue = _NewcellValue;
+                                            cell.OperationType = OperationTypeEnum.ReplaceText;
+                                        }
+                                        else
+                                        {
+                                            if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                            {
+                                                cell.NewValue = thisYarMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
+                                                cell.OperationType = OperationTypeEnum.ReplaceText;
+                                            }
+                                        }
+
+                                    }
+                                    alreadyReplaceMatchItemList.Add(currentReplaceCell.Index);
+                                    alreadyReplaceMatchItemList.Add(tagetIndex);
+                                }
+
+                            }
                         }
-                        //下一行已经替换 跳过循环
-                        i++;
+
 
                     }
                 }
@@ -1668,7 +1852,7 @@ namespace WordDemo
                             }
                             else
                             {
-                                if (!string.IsNullOrWhiteSpace(cell.OldValue))
+                                if (!string.IsNullOrWhiteSpace(cell.OldValue) && cell.OperationType != OperationTypeEnum.ChangeColor)
                                 {
                                     cell.NewValue = "";
                                     cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1698,7 +1882,7 @@ namespace WordDemo
                                 else
                                 {
                                     var newValue = prevMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
-                                    if (cell.OldValue != newValue)
+                                    if (cell.OldValue != newValue && cell.OperationType != OperationTypeEnum.ChangeColor)
                                     {
                                         cell.NewValue = newValue;
                                         cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1748,7 +1932,7 @@ namespace WordDemo
                             //当前匹配列是key 从左往右替换
                             foreach (var cell in currentMatchItemColumnCellList)
                             {
-                                if (!cell.IsHeadColumn)
+                                if (!cell.IsHeadColumn && cell.OperationType != OperationTypeEnum.ChangeColor)
                                 {
                                     cell.NewValue = "";
                                     cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1757,7 +1941,7 @@ namespace WordDemo
                             }
                             foreach (var cell in nextMatchItemColumnCellList)
                             {
-                                if (!cell.IsHeadColumn)
+                                if (!cell.IsHeadColumn && cell.OperationType != OperationTypeEnum.ChangeColor)
                                 {
                                     cell.NewValue = currentMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
                                     cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1770,7 +1954,7 @@ namespace WordDemo
                             //下一匹配列是key 从右往左替换
                             foreach (var cell in nextMatchItemColumnCellList)
                             {
-                                if (!cell.IsHeadColumn)
+                                if (!cell.IsHeadColumn && cell.OperationType != OperationTypeEnum.ChangeColor)
                                 {
                                     cell.NewValue = "";
                                     cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1778,7 +1962,7 @@ namespace WordDemo
                             }
                             foreach (var cell in currentMatchItemColumnCellList)
                             {
-                                if (!cell.IsHeadColumn)
+                                if (!cell.IsHeadColumn && cell.OperationType != OperationTypeEnum.ChangeColor)
                                 {
                                     cell.NewValue = nextMatchItemColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex)?.OldValue;
                                     cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -1833,33 +2017,38 @@ namespace WordDemo
                                 var matchValueColumnCellList = allCellList.Where(w => w.StartColumnIndex == valueReplaceCell.Index && !w.IsHeadColumn).ToList();
                                 foreach (var cell in matchKeyColumnCellList)
                                 {
-                                    //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
-                                    if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                    if (cell.OperationType != OperationTypeEnum.ChangeColor)
                                     {
-                                        continue;
+                                        //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
+                                        if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                        {
+                                            continue;
+                                        }
+                                        if (cell.OldValue == "")
+                                        {
+                                            continue;
+                                        }
+                                        cell.NewValue = "";
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
-                                    if (cell.OldValue == "")
-                                    {
-                                        continue;
-                                    }
-                                    cell.NewValue = "";
-                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                                 foreach (var cell in matchValueColumnCellList)
                                 {
-                                    //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
-                                    if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                    if (cell.OperationType != OperationTypeEnum.ChangeColor)
                                     {
-                                        continue;
+                                        //lxz 临时处理，由于表格识别错误，tableNumber=55 多个表格识别成一个表格
+                                        if (Regex.IsMatch(cell.OldValue, @"上年|本年|上期|本期|期初|期末|人民币"))
+                                        {
+                                            continue;
+                                        }
+                                        var dataSourceCell = matchKeyColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex);
+                                        if (cell.NewValue == dataSourceCell?.OldValue)
+                                        {
+                                            continue;
+                                        }
+                                        cell.NewValue = dataSourceCell?.OldValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
                                     }
-
-                                    var dataSourceCell = matchKeyColumnCellList.FirstOrDefault(w => w.StartRowIndex == cell.StartRowIndex);
-                                    if (cell.NewValue == dataSourceCell?.OldValue)
-                                    {
-                                        continue;
-                                    }
-                                    cell.NewValue = dataSourceCell?.OldValue;
-                                    cell.OperationType = OperationTypeEnum.ReplaceText;
                                 }
                                 alreadyReplaceMatchItemList.Add($"{keyReplaceCell.Index}_{valueReplaceCell.Index}");
                             }
@@ -2198,7 +2387,7 @@ namespace WordDemo
                                 //清空从第二列开始数据
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    if (!string.IsNullOrWhiteSpace(cell.OldValue))
+                                    if (!string.IsNullOrWhiteSpace(cell.OldValue) && cell.OperationType != OperationTypeEnum.ChangeColor)
                                     {
                                         cell.NewValue = "";
                                         cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -2239,7 +2428,7 @@ namespace WordDemo
                                     foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                     {
                                         var newCellValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                        if (cell.OldValue != newCellValue)
+                                        if (cell.OldValue != newCellValue && cell.OperationType != OperationTypeEnum.ChangeColor)
                                         {
                                             cell.NewValue = newCellValue;
                                             cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -2282,7 +2471,7 @@ namespace WordDemo
                                 //清空从第二列开始数据
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    if (!string.IsNullOrWhiteSpace(cell.OldValue))
+                                    if (!string.IsNullOrWhiteSpace(cell.OldValue) && cell.OperationType != OperationTypeEnum.ChangeColor)
                                     {
                                         cell.NewValue = "";
                                         cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -2322,7 +2511,7 @@ namespace WordDemo
                                     foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                     {
                                         var newCellValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                        if (cell.OldValue != newCellValue)
+                                        if (cell.OldValue != newCellValue && cell.OperationType != OperationTypeEnum.ChangeColor)
                                         {
                                             cell.NewValue = newCellValue;
                                             cell.OperationType = OperationTypeEnum.ReplaceText;
@@ -2362,8 +2551,12 @@ namespace WordDemo
                             //清空从第二列开始数据
                             foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                             {
-                                cell.NewValue = "";
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
+                                if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                {
+                                    cell.NewValue = "";
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
+                                }
+
                             }
                         }
                     }
@@ -2380,8 +2573,12 @@ namespace WordDemo
                                 var dataRowCellList = tableDateRowCellList.Where(w => w.StartRowIndex == mapDataRowIndex).ToList();
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                    {
+                                        cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
+
                                 }
                             }
 
@@ -2403,8 +2600,12 @@ namespace WordDemo
                             //清空从第二列开始数据
                             foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                             {
-                                cell.NewValue = "";
-                                cell.OperationType = OperationTypeEnum.ReplaceText;
+                                if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                {
+                                    cell.NewValue = "";
+                                    cell.OperationType = OperationTypeEnum.ReplaceText;
+                                }
+
                             }
                         }
                     }
@@ -2421,8 +2622,11 @@ namespace WordDemo
                                 var dataRowCellList = nextTableDateRowCellList.Where(w => w.StartRowIndex == mapDataRowIndex).ToList();
                                 foreach (var cell in row.RowCells.Where(w => w.StartColumnIndex > 1))
                                 {
-                                    cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
-                                    cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    if (cell.OperationType != OperationTypeEnum.ChangeColor)
+                                    {
+                                        cell.NewValue = dataRowCellList.FirstOrDefault(w => w.StartColumnIndex == cell.StartColumnIndex)?.OldValue;
+                                        cell.OperationType = OperationTypeEnum.ReplaceText;
+                                    }
                                 }
                             }
                         }
@@ -2493,6 +2697,31 @@ namespace WordDemo
 
             return cellValue;
         }
+
+
+        private static string GetNextOrPreDateHeadCellValue(string cellValue, bool IsNext = true)
+        {
+            var dateString = cellValue.GetDateString();
+            if (string.IsNullOrEmpty(dateString))
+            {
+                return "";
+            }
+            var date = Convert.ToDateTime(dateString);
+            int x = IsNext ? 1 : -1;
+            DateTime? nextMaxDate = new DateTime(date.Year + x, date.Month, date.Day);
+
+            //lxz 2024-07-31 目前只替换年,月和日 不用替换，用户没提出来则不用管
+            var nextMaxDateYearStr = $"{nextMaxDate.Value.Year}年";
+            var match = Regex.Match(cellValue, @"\d{4}\s+年");
+            if (match.Success)
+            {
+                nextMaxDateYearStr = Regex.Replace(match.Value, @"\d{4}", nextMaxDate.Value.Year + "");
+            }
+            cellValue = Regex.Replace(cellValue, @"\d{4}\s*年", nextMaxDateYearStr);
+
+            return cellValue;
+        }
+
 
         /// <summary>
         /// 补充单元格
@@ -2779,7 +3008,7 @@ namespace WordDemo
             {
                 table.OperationType = OperationTypeEnum.ChangeColor;
             }
-            else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.OperationType==OperationTypeEnum.ReplaceText)).Any())
+            else if (table.OperationType == OperationTypeEnum.ReplaceText && !table.Rows.Where(x => x.RowCells.Any(c => c.OperationType == OperationTypeEnum.ReplaceText)).Any())
             {
                 table.OperationType = OperationTypeEnum.ChangeColor;
             }
@@ -2842,7 +3071,7 @@ namespace WordDemo
                     #endregion
 
                     #region 同表上下替换 判断当前表格第一列是否包含两个及以上不同日期或者包含任意一组关键字
-                    var verticalHeadRowCellList = GetVerticalTableHeadRow(table.Rows);
+                    var verticalHeadRowCellList = GetVerticalTableHeadRow(table.DataRows);
                     var isTheSameHeadRow = IsTheSameHeadRow(table, tables);
                     if (!isTheSameHeadRow)
                     {
@@ -2907,7 +3136,7 @@ namespace WordDemo
                             string tableHeadRowContent = string.Join("", horizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
                             string nextTableHeadRowContent = string.Join("", nextTableHorizontalHeadRowCellList.Select(s => s.CellValue)).ReplaceAllReplaceItem().RemoveBracketContent().RemoveSpaceAndEscapeCharacter();
 
-                            string currentTableFirstReplaceMatchItem = horizontalHeadRowCellList.Where(w=>!string.IsNullOrWhiteSpace(w.ReplaceMatchItem)&&w.ReplaceMatchItemType==ReplaceMatchItemTypeEnum.Keyword).FirstOrDefault()?.ReplaceMatchItem;
+                            string currentTableFirstReplaceMatchItem = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem) && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).FirstOrDefault()?.ReplaceMatchItem;
                             string nextTableFirstReplaceMatchItem = nextTableHorizontalKeywordReplaceMatchItemList.FirstOrDefault()?.ReplaceMatchItem;
                             bool isKeyValuePair = !string.IsNullOrWhiteSpace(currentTableFirstReplaceMatchItem) && !string.IsNullOrWhiteSpace(nextTableFirstReplaceMatchItem)
                                 && replaceItemList.Count(w => (w.Key == currentTableFirstReplaceMatchItem && w.Value == nextTableFirstReplaceMatchItem) ||
@@ -2918,7 +3147,7 @@ namespace WordDemo
                                 || (horizontalKeywordReplaceMatchItemGroupCount == 1 && nextTableHorizontalKeywordReplaceMatchItemGroupCount == 1 && isKeyValuePair))) //上下两个表都有一个关键字匹配项，且是一堆键值对
                             {
                                 horizontalKeywordReplaceMatchItemList = horizontalHeadRowCellList.Where(w => !string.IsNullOrWhiteSpace(w.ReplaceMatchItem)
-                                && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
+                                 && w.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Keyword).ToList();
                                 //执行跨表替换逻辑
                                 CrossTableReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList,
                                     nextTable, nextTableHorizontalDateReplaceMatchItemList, nextTableHorizontalKeywordReplaceMatchItemList);
@@ -3151,70 +3380,70 @@ namespace WordDemo
         #region Common
 
         /// <summary>
-        /// 检测表格数据行第一列是否需要标黄
+        /// 检测表格数据行第一列是否有干扰项需要标黄
         /// </summary>
-        /// <param name="wordTable"></param>
-        private static void CheckTableDateRowFirstColumnIsChangeColor(WordTable wordTable)
+        /// <param name="wordTables"></param>
+        private static void CheckTableDateRowFirstColumnIsChangeColor(List<WordTable> wordTables)
         {
             var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
-            var dataRowFirstColumnCellList = wordTable.DataRowFirstColumnCells;
-            var needChangeColorRowNumberList = new List<int>();
-            if (dataRowFirstColumnCellList.Any())
+            foreach (var wordTable in wordTables)
             {
-                for (int i = 0; i < dataRowFirstColumnCellList.Count; i++)
+                var dataRowFirstColumnCellList = wordTable.DataRowFirstColumnCells;
+                var needChangeColorRowNumberList = new List<int>();
+                if (dataRowFirstColumnCellList.Any())
                 {
-                    var currentFirstColumnCell = dataRowFirstColumnCellList[i];
-                    var cellReplaceItemList = currentFirstColumnCell.OldValue.GetAllReplaceItemList();
-                    if (!cellReplaceItemList.Any())
+                    for (int i = 0; i < dataRowFirstColumnCellList.Count; i++)
                     {
-                        continue;
-                    }
-                    if (cellReplaceItemList.Count >= 2)
-                    {
-                        if (replaceItemList.Any(w => cellReplaceItemList.Contains(w.Key) && cellReplaceItemList.Contains(w.Value)))
+                        var currentFirstColumnCell = dataRowFirstColumnCellList[i];
+                        var cellReplaceItemList = currentFirstColumnCell.OldValue.GetAllReplaceItemList();
+                        if (!cellReplaceItemList.Any())
                         {
-                            //任意一组关键字存在于当前单元格关键字匹配项中 代表需要标黄
+                            continue;
+                        }
+                        if (cellReplaceItemList.Count >= 2)
+                        {
+                            //当前单元格有两个匹配项 代表整行需要标黄 如：年初及年末数
                             needChangeColorRowNumberList.Add(currentFirstColumnCell.StartRowIndex);
                         }
-
-                    }
-                    else
-                    {
-                        //制表位表格 单元格匹配到一个替换项 
-                        if (wordTable.IsTabStopTable)
+                        else
                         {
-                            WordTableCell nextRowFirstColumnCell = null;
-                            if (i < dataRowFirstColumnCellList.Count - 1)
+                            //制表位表格 单元格匹配到一个替换项 
+                            if (wordTable.IsTabStopTable)
                             {
-                                nextRowFirstColumnCell = dataRowFirstColumnCellList[i + 1];
-                            }
-
-                            if (nextRowFirstColumnCell != null)
-                            {
-                                //当前单元格与下一行单元格合并内容 如果包含一对键值对关键字 且包含"和"或者"及" 当前单元格所在行和下一行都标黄
-                                string mergeCellOldValue = string.Join("", new string[] { currentFirstColumnCell.OldValue, nextRowFirstColumnCell.OldValue });
-                                var mergeCellReplaceItemList = mergeCellOldValue.GetAllReplaceItemList();
-                                if (mergeCellReplaceItemList.Count >= 2 && new string[] { "和", "及" }.Any(w => mergeCellOldValue.Contains(w)) && replaceItemList.Any(w => mergeCellOldValue.Contains(w.Key) && mergeCellOldValue.Contains(w.Value)))
+                                WordTableCell nextRowFirstColumnCell = null;
+                                if (i < dataRowFirstColumnCellList.Count - 1)
                                 {
-                                    needChangeColorRowNumberList.AddRange(new int[] {
+                                    nextRowFirstColumnCell = dataRowFirstColumnCellList[i + 1];
+                                }
+
+                                if (nextRowFirstColumnCell != null)
+                                {
+                                    //当前单元格与下一行单元格合并内容 如果包含两个匹配项 且包含"和"或者"及" 当前单元格所在行和下一行都标黄
+                                    string mergeCellOldValue = string.Join("", new string[] { currentFirstColumnCell.OldValue, nextRowFirstColumnCell.OldValue });
+                                    var mergeCellReplaceItemList = mergeCellOldValue.GetAllReplaceItemList();
+                                    if (mergeCellReplaceItemList.Count >= 2 && new string[] { "和", "及" }.Any(w => mergeCellOldValue.Contains(w)))
+                                    {
+                                        needChangeColorRowNumberList.AddRange(new int[] {
                                        currentFirstColumnCell.StartRowIndex,nextRowFirstColumnCell.StartRowIndex
                                     });
 
-                                    //跳过下一行
-                                    i++;
+                                        //跳过下一行
+                                        i++;
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                foreach (var rowNumber in needChangeColorRowNumberList)
+                {
+                    wordTable.Rows.FirstOrDefault(w => w.RowNumber == rowNumber).RowCells.ForEach(f => {
+                        f.OperationType = OperationTypeEnum.ChangeColor;
+                    });
+                }
             }
 
-            foreach (var rowNumber in needChangeColorRowNumberList)
-            {
-                wordTable.Rows.FirstOrDefault(w => w.RowNumber == rowNumber).RowCells.ForEach(f => {
-                    f.OperationType = OperationTypeEnum.ChangeColor;
-                });
-            }
         }
 
         /// <summary>
@@ -3530,11 +3759,26 @@ namespace WordDemo
                 var needDeleteTableList = new List<WordTable>();
                 foreach (var table in tables)
                 {
-                    var splitResultList = FindTables(table);
-                    if (splitResultList.Count > 1)
+                    try
                     {
-                        needAddTableList.AddRange(splitResultList);
-                        needDeleteTableList.Add(table);
+                        var splitResultList = FindTables(table);
+                        if (splitResultList.Count > 1)
+                        {
+                            needAddTableList.AddRange(splitResultList);
+                            needDeleteTableList.Add(table);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (errorMsg_Event != null)
+                        {
+                            var tabTypeStr = table.IsTabStopTable ? "制表位表格" : "表格";
+                            errorMsg_Event(null, new Events.NodeNotifyEventArgs
+                            {
+                                Type = 2,
+                                Message = $"{table.PageNumber}页,首行内容：{table.FirstRowContent};尾行内容:{table.LastRowContent}，{tabTypeStr}拆分错误，ex:{ex.Message}"
+                            });
+                        }
                     }
                 }
                 if (needAddTableList.Any() && needDeleteTableList.Any())
@@ -3558,7 +3802,7 @@ namespace WordDemo
                     errorMsg_Event(null, new Events.NodeNotifyEventArgs
                     {
                         Type = 2,
-                        Message = $"制表位表格拆分错误，ex:{ex.Message}"
+                        Message = $"表格拆分错误，ex:{ex.Message}"
                     });
                 }
 
@@ -3907,6 +4151,10 @@ namespace WordDemo
                 var any = row.RowCells.Any(x => x.StartColumnIndex != 1 && !Regex.IsMatch(x.OldValue, @"((\d{1,3},\d+)+)|(\b(?!\d{4,})\d+\b)") && (x.OldValue.Trim().Equals("人民币") || x.OldValue.Trim().Equals("折合人民币元") || x.OldValue.Trim().Equals("人民币元") || x.OldValue.Trim().Equals("%") || x.OldValue.Trim().Equals("美元")));
                 if (any)
                 {
+                    if (tableHeadRowEndRowIndexList.Any() && tableHeadRowEndRowIndexList.Last() + 1 == i)
+                    {
+                        tableHeadRowEndRowIndexList.RemoveAt(tableHeadRowEndRowIndexList.Count - 1);
+                    }
                     tableHeadRowEndRowIndexList.Add(i);
                 }
                 //if (new string[] { "人民币", "人民币元" }.Any(w => row.RowContent.Contains(w))
