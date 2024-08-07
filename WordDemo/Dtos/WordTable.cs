@@ -123,5 +123,10 @@ namespace WordDemo
         public string DateRowFirstColumnContent => DataRowFirstColumnCells.Any() ?
             string.Join("", DataRowFirstColumnCells.Select(s => s.OldValue)) : "";
 
+        /// <summary>
+        /// 列数
+        /// </summary>
+        public int ColumnNumber =>Rows.Any()? Rows.SelectMany(s => s.RowCells).Max(m => m.StartColumnIndex):0;
+
     }
 }
