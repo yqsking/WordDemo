@@ -1,7 +1,9 @@
-﻿using Microsoft.Office.Interop.Word;
+﻿using DocumentFormat.OpenXml.Office2010.ExcelAc;
+using Microsoft.Office.Interop.Word;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using WordDemo.Enums;
 using WordDemo.Models;
 
@@ -123,10 +125,38 @@ namespace WordDemo
         public string DateRowFirstColumnContent => DataRowFirstColumnCells.Any() ?
             string.Join("", DataRowFirstColumnCells.Select(s => s.OldValue)) : "";
 
+     
         /// <summary>
-        /// 列数
+        /// 表格数字金额列
         /// </summary>
-        public int ColumnNumber =>Rows.Any()? Rows.SelectMany(s => s.RowCells).Max(m => m.StartColumnIndex):0;
+        public List<(int ColumnIndex, string ColumnContent)> NumberColumnContents { 
+            get {
+                var numberColumnContnetList = new List<(int ColumnIndex, string ColumnContent)>();
+                if(DataRows.Any()&&HeadRows.Any())
+                {
+                    var headRowCellList = HeadRows.SelectMany(s => s.RowCells).ToList();
+                    var dataRowCellList = DataRows.SelectMany(s => s.RowCells).ToList();
+                    var maxStartColumnIndex = dataRowCellList.Max(m => m.StartColumnIndex);
+                    for (int i = 1; i <= maxStartColumnIndex; i++)
+                    {
+                        var currentColumnCellValueList = dataRowCellList.Where(w => w.StartColumnIndex == i).Select(s => s.OldValue).ToList();
+                        var currentColumnCellJoinString = string.Join("", currentColumnCellValueList);
+                        bool isNumberColumn= currentColumnCellJoinString.IsWordTableDateRow()||string.IsNullOrWhiteSpace(currentColumnCellJoinString)
+                            ||currentColumnCellJoinString.ToArray().All(w=>w.ToString()=="-"); 
+                        if(isNumberColumn)
+                        {
+                            var currentHeadColumnCellValueList= headRowCellList.Where(w=>w.StartColumnIndex==i).OrderBy(o=>o.StartRowIndex).Select(s => s.OldValue).ToList();
+                            var currentHeadColumnJoinString = string.Join("", currentHeadColumnCellValueList);
+                            if(!currentHeadColumnJoinString.Contains("附注"))
+                            {
+                                numberColumnContnetList.Add((i, currentColumnCellJoinString));
+                            }
+                        }
 
+                    }
+                }
+                return numberColumnContnetList; 
+            }
+        }
     }
 }

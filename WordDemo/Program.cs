@@ -26,6 +26,7 @@ namespace WordDemo
             //GetOcrTableCellReplaceRule();
 
             FormattingWord();
+
         }
 
       
@@ -250,6 +251,7 @@ namespace WordDemo
 
 
             //测试制表符对齐文件路径
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_test.docx");
             string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update_test.docx");
             //全角半角符号设置文件路径
             //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/引号.docx");

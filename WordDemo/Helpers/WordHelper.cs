@@ -1,13 +1,10 @@
-﻿using DocumentFormat.OpenXml.ExtendedProperties;
-using DocumentFormat.OpenXml.InkML;
-using Microsoft.Office.Interop.Word;
+﻿using Microsoft.Office.Interop.Word;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -25,138 +22,196 @@ namespace WordDemo
         /// 格式化制表位表格
         /// </summary>
         /// <param name="doc"></param>
-        /// <param name="firstDateColumnPosition"></param>
-        /// <param name="lastDateColumnPosition"></param>
-        public static void FormatTable(Document doc,float firstDateColumnPosition=0,float lastDateColumnPosition=0)
+        /// <param name="firstDateColumnPosition">首列数字列制表符点位</param>
+        /// <param name="lastDateColumnPosition">最后一列数字列制表符点位</param>
+        public static void FormatTable(Document doc, float firstDateColumnPosition = 0, float lastDateColumnPosition = 0)
         {
             var watch = new Stopwatch();
             watch.Start();
             var paragraphList = new List<WordParagraph>();
             var wordParagraphAndNormalTableResult = GetWordParagraphAndNormalTable(doc);
-            paragraphList = wordParagraphAndNormalTableResult.Paragraphs.Where(w =>! w.IsUsed).ToList();
-            var tabStopTableList= GetIdentifyFailTabStopTableList(paragraphList);
+            paragraphList = wordParagraphAndNormalTableResult.Paragraphs.Where(w => !w.IsUsed).ToList();
+            var tabStopTableList = GetIdentifyFailTabStopTableList(paragraphList);
             Console.Clear();
-            foreach(var tabStopTable in tabStopTableList)
+            foreach (var tabStopTable in tabStopTableList)
             {
-                if(tabStopTable.ColumnNumber>4)
+                if (!tabStopTable.HeadRows.Any())
                 {
                     continue;
                 }
-                //验证是否有两列数据行
-                foreach(var row in tabStopTable.Rows)
+                var numberColumnContentList = tabStopTable.NumberColumnContents;
+                if (numberColumnContentList.Count > 2)
                 {
-                    foreach(var cell in row.RowCells)
+                    continue;
+                }
+                foreach (var row in tabStopTable.Rows)
+                {
+                    //获取当前行所有制表位点位
+                    var tabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
+                    foreach (TabStop tabStop in row.Range.Paragraphs.First.TabStops)
                     {
-                        var cellLeftMargin = cell.Range.Information[WdInformation.wdHorizontalPositionRelativeToPage];
-                        $"第{row.RowNumber}行第{cell.StartColumnIndex}列与左边距距离{cellLeftMargin}".Console(ConsoleColor.Yellow);
+                        tabStopPositionList.Add((tabStop.Alignment, tabStop.Position));
                     }
+                    var newTabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
 
-                    //纵页 504  横页 504+250
-                    WdOrientation pageOrientation = row.Range.PageSetup.Orientation;
-                    float maxPosition = 504;
-                    if(pageOrientation==WdOrientation.wdOrientLandscape)
+                    for (int columnIndex = 0; columnIndex < row.RowCells.Count; columnIndex++)
                     {
-                        maxPosition += 250;
-                    }
-                    var tabStopList = new List<(WdTabAlignment Alignment,float Position)>();
-                    foreach(TabStop tabStop in row.Range.Paragraphs.First.TabStops)
-                    {
-                        tabStopList.Add((tabStop.Alignment, tabStop.Position));
-                    }
+                        var currentCell = row.RowCells[columnIndex];
+                        var cellRangeTabStopPositionList = tabStopPositionList.Where(w => w.Position >= currentCell.MinLeftMargin && w.Position < currentCell.MaxLeftMargin).ToList();
 
-                    var tabStopCount= Regex.Matches(row.Range.Text, "\t").Count;
-                    var normalTabStopList = tabStopList.Where(w => w.Position < maxPosition).ToList();
-                    while (normalTabStopList.Count!=tabStopCount)
-                    {
-                        var lastNormalTabStop= normalTabStopList.Last();
-                        if(normalTabStopList.Count<tabStopCount)
+                        if (currentCell.IsHeadColumn)
                         {
-                            var nextTabStopIndex= tabStopList.IndexOf(lastNormalTabStop)+1;
-                            normalTabStopList.Add(tabStopList[nextTabStopIndex]);
+                            //表头行：
+                            //空单元格的范围内的点位位置不变 改为居中对齐;
+                            //非空单元格的范围内点位 优先取离当前单元格内容中间位置和单元格内容右边位置最近的两个点位
+                            //再取两个点位中位置差绝对值最小的点位 改为居中对齐 其余点位删除
+                            if (!cellRangeTabStopPositionList.Any())
+                            {
+                                //当前单元格范围内没有点位 跳过
+                                continue;
+                            }
+                            if (string.IsNullOrWhiteSpace(currentCell.OldValue))
+                            {
+                                //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成居中对齐
+                                cellRangeTabStopPositionList.ForEach(f => {
+                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, f.Position));
+                                });
+                            }
+                            else
+                            {
+
+                                //当前单元格文本与正文最大左边距
+                                float currentCellTextMaxLeftMargin = GetCellContentLeftMarginInfo(currentCell.Range).CellContentMaxLeftMargin;
+                                //当前单元格文本中间位置与正文左边距
+                                float currentCellTextCenterPositionLeftMargin = (currentCell.MinLeftMargin + currentCellTextMaxLeftMargin) / 2;
+
+                                var centerPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabCenter)
+                                    .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextCenterPositionLeftMargin - s.Position) })
+                                    .OrderBy(o => o.AbsDiff).ToList();
+
+                                var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
+                                    .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextMaxLeftMargin - s.Position) })
+                                    .OrderBy(o => o.AbsDiff).ToList();
+
+                                if (centerPositionAbsDiffResultList.Any() && rightPositionAbsDiffResultList.Any())
+                                {
+                                    //居中 居右都有最近点位 取绝对值差最小的一个
+                                    var centerPosition = centerPositionAbsDiffResultList.FirstOrDefault();
+                                    var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
+                                    if (centerPosition.AbsDiff < rightPosition.AbsDiff)
+                                    {
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPosition.Position));
+                                    }
+                                    else
+                                    {
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPosition.Position));
+                                    }
+                                }
+                                else if (centerPositionAbsDiffResultList.Any())
+                                {
+                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPositionAbsDiffResultList.FirstOrDefault().Position));
+                                }
+                                else if (rightPositionAbsDiffResultList.Any())
+                                {
+                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPositionAbsDiffResultList.FirstOrDefault().Position));
+                                }
+
+                            }
                         }
                         else
                         {
-                            normalTabStopList.Remove(lastNormalTabStop);
+                            //数据行：
+                            //非数据列单元格范围内的点位位置不变
+                            //数据列单元格范围内的点位 如果外部有传入
+                            if (numberColumnContentList.Any(w => w.ColumnIndex == columnIndex + 1))
+                            {
+                                var currentCellTabStopPosition = (columnIndex + 1) != numberColumnContentList.LastOrDefault().ColumnIndex
+                                    ? firstDateColumnPosition : lastDateColumnPosition;
+                                if (currentCellTabStopPosition <= 0)
+                                {
+                                    if (!cellRangeTabStopPositionList.Any())
+                                    {
+                                        //当前单元格范围内没有点位
+                                        continue;
+                                    }
+                                    if (string.IsNullOrWhiteSpace(currentCell.OldValue))
+                                    {
+                                        //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成小数点对齐
+                                        cellRangeTabStopPositionList.ForEach(f => {
+                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, f.Position));
+                                        });
+                                    }
+                                    else
+                                    {
+                                        //如果没有传入点位 根据当前数据单元格范围内的点位 优先取小数点对齐和居右对齐
+                                        var cellContentLeftMarginInfo = GetCellContentLeftMarginInfo(currentCell.Range);
+                                        //当前单元格文本与正文最大左边距
+                                        float currentCellTextMaxLeftMargin = cellContentLeftMarginInfo.CellContentMaxLeftMargin;
+                                        //当前单元格文本中的小数点与正文左边距
+                                        float cellDecimalPointLeftMargin = cellContentLeftMarginInfo.DecimalPointLeftMargin;
+
+                                        var decimalPointPositionAbsDiffList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabDecimal)
+                                        .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(cellDecimalPointLeftMargin - s.Position) })
+                                        .OrderBy(o => o.AbsDiff).ToList();
+
+                                        var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
+                                       .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextMaxLeftMargin - s.Position) })
+                                       .OrderBy(o => o.AbsDiff).ToList();
+
+                                        if (decimalPointPositionAbsDiffList.Any() && rightPositionAbsDiffResultList.Any())
+                                        {
+                                            //居中 居右都有最近点位 取绝对值差最小的一个
+                                            var decimalPointPosition = decimalPointPositionAbsDiffList.FirstOrDefault();
+                                            var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
+                                            if (decimalPointPosition.AbsDiff < rightPosition.AbsDiff)
+                                            {
+                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPosition.Position));
+                                            }
+                                            else
+                                            {
+                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPosition.Position));
+                                            }
+                                        }
+                                        else if (decimalPointPositionAbsDiffList.Any())
+                                        {
+                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPositionAbsDiffList.FirstOrDefault().Position));
+                                        }
+                                        else if (rightPositionAbsDiffResultList.Any())
+                                        {
+                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPositionAbsDiffResultList.FirstOrDefault().Position));
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    //传入了点位 直接用外部传入点位
+                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, currentCellTabStopPosition));
+                                }
+
+                            }
+                            else
+                            {
+                                //当前列不是数据列 保留原始点位
+                                cellRangeTabStopPositionList.ForEach(f => {
+                                    newTabStopPositionList.Add((f.Alignment, f.Position));
+                                });
+                            }
                         }
-                       
+
                     }
 
-                    if (firstDateColumnPosition<=0)
-                    {
-                        firstDateColumnPosition = normalTabStopList[normalTabStopList.Count - 2].Position;
-                       
-                    }
-                    if(lastDateColumnPosition<=0)
-                    {
-                        lastDateColumnPosition = normalTabStopList[normalTabStopList.Count - 1].Position;
-                    }
-                    $"第{tabStopTable.PageNumber}页第{tabStopTable.TableNumber}个表格第{row.RowNumber}行({row.RowContent})有{tabStopList.Count}个制表符".Console(ConsoleColor.Yellow);
-
-                    normalTabStopList.Remove(normalTabStopList.Last());
-                    normalTabStopList.Remove(normalTabStopList.Last());
-                    if (row.IsHeadRow)
-                    {
-                        normalTabStopList.Add((WdTabAlignment.wdAlignTabCenter,firstDateColumnPosition));
-                        normalTabStopList.Add((WdTabAlignment.wdAlignTabCenter,lastDateColumnPosition));
-                    }
-                    else
-                    {
-                        normalTabStopList.Add((WdTabAlignment.wdAlignTabDecimal, firstDateColumnPosition));
-                        normalTabStopList.Add((WdTabAlignment.wdAlignTabDecimal, lastDateColumnPosition));
-                    }
-                   
                     row.Range.Paragraphs.First.TabStops.ClearAll();
-                    normalTabStopList.ForEach(f =>
+                    newTabStopPositionList.ForEach(f =>
                     {
                         row.Range.Paragraphs.First.TabStops.Add(f.Position, f.Alignment);
                     });
+
 
                 }
             }
             watch.Stop();
             $"耗时：{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
         }
-
-        public static void SetParagraphSymbolFont(Paragraph paragraph)
-            {
-
-                var fontName = "Times New Roman";
-                var paragraphRange = paragraph.Range;
-
-                var txt = paragraphRange.Text;
-                var pattern = @"[“”‘’]";
-                var matches = Regex.Matches(txt, pattern);
-                var IdxList = new List<int>();
-                if (matches.Count > 0)
-                {
-                    var txtLength = txt.Length;
-
-                    for (int i = 0; i < txtLength; i++)
-                    {
-                        var item = txt[i].ToString();
-                        if (Regex.IsMatch(item, pattern))
-                        {
-                            IdxList.Add(i);
-                        }
-                        if (IdxList.Count == matches.Count)
-                        {
-                            break;
-                        }
-                    }
-                    if (IdxList.Count > 0)
-                    {
-                        foreach (var idx in IdxList)
-                        {
-                            var itemRange = paragraph.Range;
-                            var cutRangeE = txtLength - idx - 1;
-                            itemRange.MoveStart(WdUnits.wdCharacter, idx);
-                            itemRange.MoveEnd(WdUnits.wdCharacter, -cutRangeE);
-                            itemRange.Font.Name = fontName;
-                        }
-                    }
-                }
-                paragraph.Range.Font.Name = fontName;
-            }
 
         /// <summary>
         /// 格式化表格表头和添加下划线
@@ -733,6 +788,10 @@ namespace WordDemo
                 SplitTables(normalTableList, errorMsg_Event);
                 //检测干扰项数据行标黄
                 CheckTableDateRowFirstColumnIsChangeColor(normalTableList);
+
+                //检查内容单元格是否有合并单元格无法确定列的情况；如果有则表格表头设置颜色；
+                ChkeckTableMargeCellChiasmaIsChangeColor(normalTableList);
+
                 BuildNormalTableCellNewValue(normalTableList, errorMsg_Event);
                 foreach (var normalTable in normalTableList)
                 {
@@ -1151,7 +1210,6 @@ namespace WordDemo
 
         #region 制表位表格
 
-
         /// <summary>
         /// 获取识别失败制表位表格
         /// </summary>
@@ -1208,6 +1266,11 @@ namespace WordDemo
 
                 }
                 prevParagraph = currentParagraph;
+
+                if (i == notUseParagraphs.Count - 1)
+                {
+                    tabStopTableParagraphList.Add(paragraphList);
+                }
             }
 
             //排除连续段落 包含\t段落数量少于2个段落的
@@ -2186,6 +2249,16 @@ namespace WordDemo
             #region 日期
             if (dateReplaceMatchItems.Any() && dateReplaceMatchItems.Count >= 2)
             {
+                #region lxz 2024-08-07 如果需要roll数的日期行除第一列内容外，其他行内容全部为空，则表格直接设置表头颜色
+                var rowNums = dateReplaceMatchItems.Select(x => x.Index);
+                var dateRowsContentList = allCellList.Where(x => x.StartColumnIndex > 1 && rowNums.Contains(x.StartRowIndex)).Select(x => x.OldValue.RemoveSpaceAndEscapeCharacter()).ToArray();
+                var dateRowsContentJoinStr = string.Join("", dateRowsContentList);
+                if (string.IsNullOrEmpty(dateRowsContentJoinStr))
+                {
+                    return;
+                }
+                #endregion
+
                 var dateReplaceMatchItemGroupList = dateReplaceMatchItems.GroupBy(g => g.ReplaceMatchItemDate).ToList();
                 if (dateReplaceMatchItems.Count % 2 == 0 && dateReplaceMatchItemGroupList.All(w => w.Count() >= 2))
                 {
@@ -2325,6 +2398,16 @@ namespace WordDemo
             #region 关键字
             if (keywordReplaceMatchItems.Any() && keywordReplaceMatchItems.Count >= 2)
             {
+                #region lxz 2024-08-07 如果需要roll数的关键字行除第一列内容外，其他行内容全部为空，则表格直接设置表头颜色
+                var rowNums = keywordReplaceMatchItems.Select(x => x.Index);
+                var dateRowsContentList = allCellList.Where(x => x.StartColumnIndex > 1 && rowNums.Contains(x.StartRowIndex)).Select(x => x.OldValue.RemoveSpaceAndEscapeCharacter()).ToArray();
+                var dateRowsContentJoinStr = string.Join("", dateRowsContentList);
+                if (string.IsNullOrEmpty(dateRowsContentJoinStr))
+                {
+                    return;
+                }
+                #endregion
+
                 var replaceItemList = WordTableConfigHelper.GetCellReplaceItemConfig();
                 var keywordReplaceMatchItemGroupList = keywordReplaceMatchItems.GroupBy(g => g.ReplaceMatchItem).ToList();
                 if (keywordReplaceMatchItems.Count % 2 == 0 && keywordReplaceMatchItemGroupList.All(w => w.Count() >= 2))
@@ -2978,7 +3061,6 @@ namespace WordDemo
             return cellValue;
         }
 
-
         private static string GetNextOrPreDateHeadCellValue(string cellValue, bool IsNext = true)
         {
             var dateString = cellValue.GetDateString();
@@ -3316,6 +3398,11 @@ namespace WordDemo
                 var table = tables[tableIndex];
                 try
                 {
+                    //lxz 2024-08-08 判断表格已经设置为修改表头颜色的，则直接下一个表格；
+                    if (table.OperationType == OperationTypeEnum.ChangeColor)
+                    {
+                        continue;
+                    }
 
                     #region 同表左右替换 判断当前表格所有表头是否包含两个及以上不同日期或者包含任意一组关键字
 
@@ -3345,9 +3432,14 @@ namespace WordDemo
                     if (horizontalDateReplaceMatchItemGroupCount >= 2 ||
                        horizontalKeywordReplaceMatchItemGroupCount >= 2)
                     {
-                        //执行同表跨列替换逻辑
-                        SameTableCrossColumnReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList);
-                        table.OperationType = OperationTypeEnum.ReplaceText;
+                        //lxz 2024-08-07 添加判断，该表格如果属于上下跨表替换则设置颜色
+                        var _isTheSameHeadRow = IsTheSameHeadRow(table, tables, true);
+                        if (!_isTheSameHeadRow)
+                        {
+                            //执行同表跨列替换逻辑
+                            SameTableCrossColumnReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList);
+                            table.OperationType = OperationTypeEnum.ReplaceText;
+                        }
 
                         //lxz 2024-07-24 添加逻辑
                         ReSetTableOperationType(table, horizontalHeadRowCellList, null);
@@ -3594,9 +3686,14 @@ namespace WordDemo
                         if (horizontalDateReplaceMatchItemGroupCount >= 2 ||
                            horizontalKeywordReplaceMatchItemGroupCount >= 2)
                         {
-                            //执行同表跨列替换逻辑
-                            SameTableCrossColumnReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList);
-                            table.OperationType = OperationTypeEnum.ReplaceText;
+                            //lxz 2024-08-07 添加判断
+                            var _isTheSameHeadRow = IsTheSameHeadRow(table, tables, true);
+                            if (!_isTheSameHeadRow)
+                            {
+                                //执行同表跨列替换逻辑
+                                SameTableCrossColumnReplace(table, horizontalDateReplaceMatchItemList, horizontalKeywordReplaceMatchItemList);
+                                table.OperationType = OperationTypeEnum.ReplaceText;
+                            }
 
                             //lxz 2024-07-22 添加逻辑
                             ReSetTableOperationType(table, horizontalHeadRowCellList, null);
@@ -3822,6 +3919,65 @@ namespace WordDemo
         }
 
         /// <summary>
+        /// 检查表格内容行是否有合并情况与表头合并不一致的情况，导致无法判断是哪一列的情况，比如，有交叉情况
+        /// </summary>
+        /// <param name="wordTables"></param>
+        private static void ChkeckTableMargeCellChiasmaIsChangeColor(List<WordTable> wordTables)
+        {
+            foreach (var wordTable in wordTables)
+            {
+                try
+                {
+
+                    var headCells = wordTable.HeadRows.SelectMany(x => x.RowCells).Where(x => x.ColSpan > 1).ToList();
+                    var dataCells = wordTable.DataRows.Where(x => x.RowCells.Any(c => c.StartColumnIndex > 1 && !string.IsNullOrWhiteSpace(c.OldValue))).SelectMany(x => x.RowCells).Where(x => x.ColSpan > 1).ToList();
+                    if (dataCells.Any() && !headCells.Any())
+                    {
+                        //内容单元格有合并情况，但是表头没有合并请，则直接认为该表格无法roll数，直接设置表头颜色
+                        wordTable.OperationType = OperationTypeEnum.ChangeColor;
+                    }
+                    else if (dataCells.Any() && headCells.Any())
+                    {
+                        //如果内容行有合并情况，则应该和表头最后一行合并情况相同
+                        //如果内容行的合并情况和表头合并情况不一致认为有问题；
+
+                        ////获取表头最后一行的行号
+                        //var maxRowIndex = headCells.Max(x => x.StartRowIndex);
+                        ////获取有合并单元格最大一行的表头，并排除第一列单元格；
+                        //var headrow = headCells.Where(x => x.StartRowIndex == maxRowIndex && x.StartColumnIndex > 1).ToList();
+                        ////获取head 单元格的 列数_合并列表数字 组合成字符串；
+                        //var headColIndexAndColSpanStrList = headrow.Select(x => $"{x.StartColumnIndex}_{x.ColSpan}").ToList();
+                        ////数据单元格排除第一列，获取 列数_合并列数字 组合字符串 排除掉 表头的组合字符串，如果还有多余的，则认为合并情况不一致，需要设置颜色
+                        //var any = dataCells.Where(x => x.StartColumnIndex > 1).Select(x => $"{x.StartColumnIndex}_{x.ColSpan}").Where(x => !headColIndexAndColSpanStrList.Contains(x)).Any();
+                        //if (any)
+                        //{
+                        //    wordTable.OperationType = OperationTypeEnum.ChangeColor;
+                        //}
+                        var _dataCells = dataCells.Where(x => x.StartColumnIndex > 1).ToList();
+
+                        var headAllCells = wordTable.HeadRows.SelectMany(x => x.RowCells).Where(x => x.StartColumnIndex > 1).ToList();
+                        foreach (var dataCell in _dataCells)
+                        {
+
+                            var headColIndexAndColSpanStrList = headAllCells.Where(x => x.StartColumnIndex == dataCell.StartColumnIndex).Select(x => $"{x.StartColumnIndex}_{x.ColSpan}");
+                            if (!headColIndexAndColSpanStrList.Contains($"{dataCell.StartColumnIndex}_{dataCell.ColSpan}"))
+                            {
+                                wordTable.OperationType = OperationTypeEnum.ChangeColor;
+                                break;
+                            }
+                        }
+
+                    }
+
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
+        }
+
+        /// <summary>
         /// 获取word的所有段落和正常表格
         /// </summary>
         /// <param name="doc"></param>
@@ -3900,7 +4056,7 @@ namespace WordDemo
         /// <param name="currentTable"></param>
         /// <param name="tables"></param>
         /// <returns></returns>
-        private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables)
+        private static bool IsTheSameHeadRow(WordTable currentTable, List<WordTable> tables, bool isFirstColContent = false)
         {
             //lxz 2024-08-05 添加判断 表头不含第一列单元格内容以 “授予日”结束， 则认为是单表替换；表格样例： 两列表格，一行表头，表头最后一个单元格 2020年12月25日授予 
             var isAny = currentTable.HeadRows.SelectMany(s => s.RowCells).Where(x => x.StartColumnIndex > 1 && Regex.IsMatch((x.OldValue ?? "").Trim('\r').Trim(), @"\d{4}\s*年\s*\d{1,2}月\s*\d{1,2}\s*日\s*授予$")).Any();
@@ -3913,18 +4069,106 @@ namespace WordDemo
             var prevTableNumber = currentTable.TableNumber - 1;
             var prevTable = tables.FirstOrDefault(w => w.TableNumber == prevTableNumber);
             var prevTableHeadRowContent = string.Empty;
+            var prevTableFirstDataContent = string.Empty;
             if (prevTable != null)
             {
                 prevTableHeadRowContent = string.Join("", prevTable.HeadRows.SelectMany(s => s.RowCells).Select(s => (s.OldValue ?? "").RemoveSpaceAndEscapeCharacter()).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem().RemoveBracketContent();
+                prevTableFirstDataContent = prevTable.DateRowFirstColumnContent;
             }
             var nextTableNumber = currentTable.TableNumber + 1;
             var nextTable = tables.FirstOrDefault(w => w.TableNumber == nextTableNumber);
             string nextTableHeadRowContent = string.Empty;
+            string nextTableFirstDataContent = string.Empty;
             if (nextTable != null)
             {
                 nextTableHeadRowContent = string.Join("", nextTable.HeadRows.SelectMany(s => s.RowCells).Select(s => (s.OldValue ?? "").RemoveSpaceAndEscapeCharacter()).Where(w => !string.IsNullOrWhiteSpace(w))).ReplaceAllReplaceItem().RemoveBracketContent();
+                nextTableFirstDataContent = nextTable.DateRowFirstColumnContent;
             }
             bool isTheSameHeadRow = currentTableHeadRowContent == prevTableHeadRowContent || currentTableHeadRowContent == nextTableHeadRowContent;
+            bool isTheSameFistCol = currentTable.DateRowFirstColumnContent == prevTableFirstDataContent || currentTable.DateRowFirstColumnContent == nextTableFirstDataContent;
+            if (isFirstColContent)
+            {
+                isTheSameHeadRow = isTheSameHeadRow && isTheSameFistCol;
+                //第一列的数据内容
+                var currentFirstColCotent = string.Join("", currentTable.DataRowFirstColumnCells.Select(x => x.OldValue));
+                //表头是关键字和日期单元格
+                var horizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(currentTable.HeadRows);
+                var currentFirstColCotentDate = currentFirstColCotent.GetDateString();
+
+                if (isTheSameHeadRow && currentTable.DateRowFirstColumnContent == prevTableFirstDataContent)
+                {
+                    //上一个表格
+                    return ChkTableOneAndTow_DateEqual(prevTable, isTheSameHeadRow, horizontalHeadRowCellList, currentFirstColCotentDate);
+                }
+                else if (currentTable.DateRowFirstColumnContent == nextTableFirstDataContent)
+                {
+                    //下一个表格
+                    return ChkTableOneAndTow_DateEqual(nextTable, isTheSameHeadRow, horizontalHeadRowCellList, currentFirstColCotentDate);
+                }
+            }
+            return isTheSameHeadRow;
+        }
+
+        /// <summary>
+        /// 检查两个表格表头或者第一列中的 第一个日期是否相等
+        /// </summary>
+        /// <param name="prevTable"></param>
+        /// <param name="isTheSameHeadRow"></param>
+        /// <param name="horizontalHeadRowCellList"></param>
+        /// <param name="currentFirstColCotentDate"></param>
+        /// <returns></returns>
+        private static bool ChkTableOneAndTow_DateEqual(WordTable prevTable, bool _isTheSameHeadRow, List<ReplaceCell> horizontalHeadRowCellList, string currentFirstColCotentDate)
+        {
+            var isTheSameHeadRow = _isTheSameHeadRow;
+            if (!string.IsNullOrEmpty(currentFirstColCotentDate))
+            {
+                //第一列内容判断
+                var prevFirstColCotent = string.Join("", prevTable.DataRowFirstColumnCells.Select(x => x.OldValue));
+                var prevFirstColCotentDateStr = prevFirstColCotent.GetDateString();
+                if (string.IsNullOrEmpty(prevFirstColCotentDateStr))
+                {
+                    isTheSameHeadRow = false;
+                    return isTheSameHeadRow;
+                }
+                var preDate = Convert.ToDateTime(prevFirstColCotentDateStr);
+                var currentDate = Convert.ToDateTime(currentFirstColCotentDate);
+                if (preDate == currentDate)
+                {
+                    isTheSameHeadRow = false;
+                    return isTheSameHeadRow;
+                }
+                isTheSameHeadRow = true;
+            }
+            else if (horizontalHeadRowCellList.Any() && horizontalHeadRowCellList.Where(x => x.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).Any())
+            {
+                //表头内容判断是否有日期判断
+                var currentHeadDateItem = horizontalHeadRowCellList.Where(x => x.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).FirstOrDefault();
+                //currentHeadDateItem.ReplaceMatchItemDate;
+                var prevHorizontalHeadRowCellList = GetHorizontalMergeTableHeadRow(prevTable.HeadRows);
+                if (currentHeadDateItem == null || currentHeadDateItem.ReplaceMatchItemDate == null || !prevHorizontalHeadRowCellList.Any())
+                {
+                    isTheSameHeadRow = false;
+                    return isTheSameHeadRow;
+                }
+                var prevHeadDateItem = prevHorizontalHeadRowCellList.Where(x => x.ReplaceMatchItemType == ReplaceMatchItemTypeEnum.Date).FirstOrDefault();
+                if (prevHeadDateItem == null || prevHeadDateItem.ReplaceMatchItemDate == null)
+                {
+                    isTheSameHeadRow = false;
+                    return isTheSameHeadRow;
+                }
+
+                if (prevHeadDateItem.ReplaceMatchItemDate == currentHeadDateItem.ReplaceMatchItemDate)
+                {
+
+                    isTheSameHeadRow = false;
+                    return isTheSameHeadRow;
+                }
+                isTheSameHeadRow = true;
+            }
+            else
+            {
+                isTheSameHeadRow = false;
+            }
             return isTheSameHeadRow;
         }
 
@@ -4192,6 +4436,41 @@ namespace WordDemo
             return tables;
         }
 
+        /// <summary>
+        /// 获取段落文本与正文最大左边距和段落文本中小数点与正文左边距
+        /// </summary>
+        /// <param name="range"></param>
+        /// <returns></returns>
+        private static (float CellContentMaxLeftMargin, float DecimalPointLeftMargin) GetCellContentLeftMarginInfo(Range range)
+        {
+            //计算\t或者\r的Range
+            Range contentRange = range.Duplicate;
+            if (contentRange.Text.Contains("\t"))
+            {
+                var tabStopIndex = contentRange.Text.IndexOf("\t");
+                contentRange.MoveStart(WdUnits.wdCharacter, tabStopIndex);
+            }
+            if (contentRange.Text.Contains("\r"))
+            {
+                var breakLineIndex = contentRange.Text.IndexOf("\r");
+                contentRange.MoveStart(WdUnits.wdCharacter, breakLineIndex);
+            }
+            float cellContentMaxLeftMargin = (float)contentRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+            float decimalPointLeftMargin = 0;
+            if (range.Text.Contains("."))
+            {
+                int decimalPointIndex = range.Text.IndexOf(".");
+                Range decimalPointRange = range.Duplicate;
+                decimalPointRange.MoveStart(WdUnits.wdCharacter, decimalPointIndex);
+                decimalPointLeftMargin = (float)decimalPointRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+            }
+            else
+            {
+                //没有小数点 小数点位置等于文本最大左边距
+                decimalPointLeftMargin = cellContentMaxLeftMargin;
+            }
+            return (cellContentMaxLeftMargin, decimalPointLeftMargin);
+        }
         #endregion
 
         #region 识别段落中的制表位表格
@@ -4713,29 +4992,30 @@ namespace WordDemo
                 return false;
         }
 
-        private static int getTabStopsCount(WordParagraph paragraph, bool ignoreInvalid = false)
+        private static int getTabStopsCount(WordParagraph wordParagraph, bool ignoreInvalid = false)
         {
-            return Regex.Matches(paragraph.OldText, "\t").Count;
-            //if (paragraph.TabStops == null)
-            //{
-            //    return -1;
-            //}
-            //var result = paragraph.TabStops.Count;
-            //if (ignoreInvalid)
-            //{
-            //    float indent = getIndent(paragraph);
-            //    TabStops tabstops = paragraph.TabStops;
-            //    var tabstopsCount = tabstops.Count;
-            //    for (int i = 1; i <= tabstopsCount; i++)
-            //    {
-            //        // 删除缩进前面的
-            //        if (tabstops[i].Position < indent)
-            //        {
-            //            result--;
-            //        }
-            //    }
-            //}
-            //return result;
+            //return Regex.Matches(paragraph.OldText, "\t").Count;
+            var paragraph = wordParagraph.Range.Paragraphs.First;
+            if (paragraph.TabStops == null)
+            {
+                return -1;
+            }
+            var result = paragraph.TabStops.Count;
+            if (ignoreInvalid)
+            {
+                float indent = getIndent(paragraph);
+                TabStops tabstops = paragraph.TabStops;
+                var tabstopsCount = tabstops.Count;
+                for (int i = 1; i <= tabstopsCount; i++)
+                {
+                    // 删除缩进前面的
+                    if (tabstops[i].Position < indent)
+                    {
+                        result--;
+                    }
+                }
+            }
+            return result;
         }
 
         private static float getIndent(Paragraph paragraph)
@@ -4763,7 +5043,6 @@ namespace WordDemo
         }
 
         #endregion
-
 
     }
 }

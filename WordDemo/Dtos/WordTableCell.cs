@@ -118,12 +118,13 @@ namespace WordDemo
         /// <summary>
         /// 单元格与页面最小左边距
         /// </summary>
-        public float StartLeftMargin { get; set; }
+        public float MinLeftMargin { get; set; }
 
         /// <summary>
         /// 单元格与页面最大左边距
         /// </summary>
-        public float EndLeftMargin { get; set; }
+        public float MaxLeftMargin { get; set; }
+
 
     }
 }
