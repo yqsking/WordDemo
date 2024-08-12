@@ -1,5 +1,6 @@
 ﻿using Microsoft.Office.Interop.Word;
 using System.Collections.Generic;
+using WordDemo.Dtos;
 using WordDemo.Enums;
 using WordDemo.Models;
 
@@ -116,14 +117,9 @@ namespace WordDemo
         public decimal YPositiondifference { get; set; }
 
         /// <summary>
-        /// 单元格与页面最小左边距
+        /// 单元格左边距信息
         /// </summary>
-        public float MinLeftMargin { get; set; }
-
-        /// <summary>
-        /// 单元格与页面最大左边距
-        /// </summary>
-        public float MaxLeftMargin { get; set; }
+        public CellLeftMarginInfo LeftMarginInfo { get; set; }
 
 
     }

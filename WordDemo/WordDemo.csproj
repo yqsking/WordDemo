@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Constants\ApiConstant.cs" />
+    <Compile Include="Dtos\CellLeftMarginInfo.cs" />
     <Compile Include="Dtos\FormattingWordTableConfig.cs" />
     <Compile Include="Dtos\IProgressModel.cs" />
     <Compile Include="Dtos\NodeNotifyEventArgs.cs" />

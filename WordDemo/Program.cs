@@ -253,9 +253,8 @@ namespace WordDemo
             //测试制表符对齐文件路径
             //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/Roll-例（原稿）_test.docx");
             string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update_test.docx");
-            //全角半角符号设置文件路径
-            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/引号.docx");
-            
+            //string wordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Files/2023017197_update.docx");
+
             string wordFileName = Path.GetFileName(wordPath);
             var wordFileNameSplitResults = wordFileName.Split('.');
             string newWordPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"{wordFileNameSplitResults.FirstOrDefault()}_格式化后.{wordFileNameSplitResults.LastOrDefault()}");
@@ -278,11 +277,7 @@ namespace WordDemo
                 //制表符对齐
                 WordHelper.FormatTable(doc);
 
-                ////全角半角符号设置
-                //foreach(Paragraph paragraph in doc.Paragraphs)
-                //{
-                //    WordHelper.SetParagraphSymbolFont(paragraph);
-                //}
+              
 
             }
             catch (Exception ex)

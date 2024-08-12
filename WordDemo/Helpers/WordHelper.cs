@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Xml.Linq;
+using WordDemo.Dtos;
 using WordDemo.Enums;
 using WordDemo.Helpers;
 using WordDemo.Models;
@@ -35,179 +36,176 @@ namespace WordDemo
             Console.Clear();
             foreach (var tabStopTable in tabStopTableList)
             {
-                if (!tabStopTable.HeadRows.Any())
+                try
                 {
-                    continue;
-                }
-                var numberColumnContentList = tabStopTable.NumberColumnContents;
-                if (numberColumnContentList.Count > 2)
-                {
-                    continue;
-                }
-                foreach (var row in tabStopTable.Rows)
-                {
-                    //获取当前行所有制表位点位
-                    var tabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
-                    foreach (TabStop tabStop in row.Range.Paragraphs.First.TabStops)
+                    if (!tabStopTable.HeadRows.Any())
                     {
-                        tabStopPositionList.Add((tabStop.Alignment, tabStop.Position));
+                        continue;
                     }
-                    var newTabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
-
-                    for (int columnIndex = 0; columnIndex < row.RowCells.Count; columnIndex++)
+                    var numberColumnContentList = tabStopTable.NumberColumnContents;
+                    if (numberColumnContentList.Count > 2)
                     {
-                        var currentCell = row.RowCells[columnIndex];
-                        var cellRangeTabStopPositionList = tabStopPositionList.Where(w => w.Position >= currentCell.MinLeftMargin && w.Position < currentCell.MaxLeftMargin).ToList();
-
-                        if (currentCell.IsHeadColumn)
+                        continue;
+                    }
+                    foreach (var row in tabStopTable.Rows)
+                    {
+                        //获取当前行所有制表位点位
+                        var tabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
+                        foreach (TabStop tabStop in row.Range.Paragraphs.First.TabStops)
                         {
-                            //表头行：
-                            //空单元格的范围内的点位位置不变 改为居中对齐;
-                            //非空单元格的范围内点位 优先取离当前单元格内容中间位置和单元格内容右边位置最近的两个点位
-                            //再取两个点位中位置差绝对值最小的点位 改为居中对齐 其余点位删除
-                            if (!cellRangeTabStopPositionList.Any())
-                            {
-                                //当前单元格范围内没有点位 跳过
-                                continue;
-                            }
-                            if (string.IsNullOrWhiteSpace(currentCell.OldValue))
-                            {
-                                //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成居中对齐
-                                cellRangeTabStopPositionList.ForEach(f => {
-                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, f.Position));
-                                });
-                            }
-                            else
-                            {
-
-                                //当前单元格文本与正文最大左边距
-                                float currentCellTextMaxLeftMargin = GetCellContentLeftMarginInfo(currentCell.Range).CellContentMaxLeftMargin;
-                                //当前单元格文本中间位置与正文左边距
-                                float currentCellTextCenterPositionLeftMargin = (currentCell.MinLeftMargin + currentCellTextMaxLeftMargin) / 2;
-
-                                var centerPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabCenter)
-                                    .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextCenterPositionLeftMargin - s.Position) })
-                                    .OrderBy(o => o.AbsDiff).ToList();
-
-                                var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
-                                    .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextMaxLeftMargin - s.Position) })
-                                    .OrderBy(o => o.AbsDiff).ToList();
-
-                                if (centerPositionAbsDiffResultList.Any() && rightPositionAbsDiffResultList.Any())
-                                {
-                                    //居中 居右都有最近点位 取绝对值差最小的一个
-                                    var centerPosition = centerPositionAbsDiffResultList.FirstOrDefault();
-                                    var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
-                                    if (centerPosition.AbsDiff < rightPosition.AbsDiff)
-                                    {
-                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPosition.Position));
-                                    }
-                                    else
-                                    {
-                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPosition.Position));
-                                    }
-                                }
-                                else if (centerPositionAbsDiffResultList.Any())
-                                {
-                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPositionAbsDiffResultList.FirstOrDefault().Position));
-                                }
-                                else if (rightPositionAbsDiffResultList.Any())
-                                {
-                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPositionAbsDiffResultList.FirstOrDefault().Position));
-                                }
-
-                            }
+                            tabStopPositionList.Add((tabStop.Alignment, tabStop.Position));
                         }
-                        else
+                        var newTabStopPositionList = new List<(WdTabAlignment Alignment, float Position)>();
+
+                        for (int columnIndex = 0; columnIndex < row.RowCells.Count; columnIndex++)
                         {
-                            //数据行：
-                            //非数据列单元格范围内的点位位置不变
-                            //数据列单元格范围内的点位 如果外部有传入
-                            if (numberColumnContentList.Any(w => w.ColumnIndex == columnIndex + 1))
+                            var currentCell = row.RowCells[columnIndex];
+                            var cellRangeTabStopPositionList = tabStopPositionList.Where(w => w.Position >= currentCell.LeftMarginInfo.CellMinLeftMargin && w.Position < currentCell.LeftMarginInfo.CellMaxLeftMargin).ToList();
+
+                            if (currentCell.IsHeadColumn)
                             {
-                                var currentCellTabStopPosition = (columnIndex + 1) != numberColumnContentList.LastOrDefault().ColumnIndex
-                                    ? firstDateColumnPosition : lastDateColumnPosition;
-                                if (currentCellTabStopPosition <= 0)
+                                //表头行：
+                                //空单元格的范围内的点位位置不变 改为居中对齐;
+                                //非空单元格的范围内点位 优先取离当前单元格内容中间位置和单元格内容右边位置最近的两个点位
+                                //再取两个点位中位置差绝对值最小的点位 改为居中对齐 其余点位删除
+                                if (!cellRangeTabStopPositionList.Any())
                                 {
-                                    if (!cellRangeTabStopPositionList.Any())
-                                    {
-                                        //当前单元格范围内没有点位
-                                        continue;
-                                    }
-                                    if (string.IsNullOrWhiteSpace(currentCell.OldValue))
-                                    {
-                                        //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成小数点对齐
-                                        cellRangeTabStopPositionList.ForEach(f => {
-                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, f.Position));
-                                        });
-                                    }
-                                    else
-                                    {
-                                        //如果没有传入点位 根据当前数据单元格范围内的点位 优先取小数点对齐和居右对齐
-                                        var cellContentLeftMarginInfo = GetCellContentLeftMarginInfo(currentCell.Range);
-                                        //当前单元格文本与正文最大左边距
-                                        float currentCellTextMaxLeftMargin = cellContentLeftMarginInfo.CellContentMaxLeftMargin;
-                                        //当前单元格文本中的小数点与正文左边距
-                                        float cellDecimalPointLeftMargin = cellContentLeftMarginInfo.DecimalPointLeftMargin;
-
-                                        var decimalPointPositionAbsDiffList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabDecimal)
-                                        .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(cellDecimalPointLeftMargin - s.Position) })
-                                        .OrderBy(o => o.AbsDiff).ToList();
-
-                                        var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
-                                       .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCellTextMaxLeftMargin - s.Position) })
-                                       .OrderBy(o => o.AbsDiff).ToList();
-
-                                        if (decimalPointPositionAbsDiffList.Any() && rightPositionAbsDiffResultList.Any())
-                                        {
-                                            //居中 居右都有最近点位 取绝对值差最小的一个
-                                            var decimalPointPosition = decimalPointPositionAbsDiffList.FirstOrDefault();
-                                            var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
-                                            if (decimalPointPosition.AbsDiff < rightPosition.AbsDiff)
-                                            {
-                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPosition.Position));
-                                            }
-                                            else
-                                            {
-                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPosition.Position));
-                                            }
-                                        }
-                                        else if (decimalPointPositionAbsDiffList.Any())
-                                        {
-                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPositionAbsDiffList.FirstOrDefault().Position));
-                                        }
-                                        else if (rightPositionAbsDiffResultList.Any())
-                                        {
-                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPositionAbsDiffResultList.FirstOrDefault().Position));
-                                        }
-                                    }
+                                    //当前单元格范围内没有点位 跳过
+                                    continue;
+                                }
+                                if (string.IsNullOrWhiteSpace(currentCell.OldValue))
+                                {
+                                    //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成居中对齐
+                                    cellRangeTabStopPositionList.ForEach(f => {
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, f.Position));
+                                    });
                                 }
                                 else
                                 {
-                                    //传入了点位 直接用外部传入点位
-                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, currentCellTabStopPosition));
-                                }
+                                    var centerPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabCenter)
+                                        .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCell.LeftMarginInfo.CellContentCenterPointLeftMargin - s.Position) })
+                                        .OrderBy(o => o.AbsDiff).ToList();
 
+                                    var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
+                                        .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCell.LeftMarginInfo.CellContentEndPointLeftMargin - s.Position) })
+                                        .OrderBy(o => o.AbsDiff).ToList();
+
+                                    if (centerPositionAbsDiffResultList.Any() && rightPositionAbsDiffResultList.Any())
+                                    {
+                                        //居中 居右都有最近点位 取绝对值差最小的一个
+                                        var centerPosition = centerPositionAbsDiffResultList.FirstOrDefault();
+                                        var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
+                                        if (centerPosition.AbsDiff < rightPosition.AbsDiff)
+                                        {
+                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPosition.Position));
+                                        }
+                                        else
+                                        {
+                                            newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPosition.Position));
+                                        }
+                                    }
+                                    else if (centerPositionAbsDiffResultList.Any())
+                                    {
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, centerPositionAbsDiffResultList.FirstOrDefault().Position));
+                                    }
+                                    else if (rightPositionAbsDiffResultList.Any())
+                                    {
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabCenter, rightPositionAbsDiffResultList.FirstOrDefault().Position));
+                                    }
+
+                                }
                             }
                             else
                             {
-                                //当前列不是数据列 保留原始点位
-                                cellRangeTabStopPositionList.ForEach(f => {
-                                    newTabStopPositionList.Add((f.Alignment, f.Position));
-                                });
+                                //数据行：
+                                //非数据列单元格范围内的点位位置不变
+                                //数据列单元格范围内的点位 如果外部有传入
+                                if (numberColumnContentList.Any(w => w.ColumnIndex == columnIndex + 1))
+                                {
+                                    var currentCellTabStopPosition = (columnIndex + 1) != numberColumnContentList.LastOrDefault().ColumnIndex
+                                        ? firstDateColumnPosition : lastDateColumnPosition;
+                                    if (currentCellTabStopPosition <= 0)
+                                    {
+                                        if (!cellRangeTabStopPositionList.Any())
+                                        {
+                                            //当前单元格范围内没有点位
+                                            continue;
+                                        }
+                                        if (string.IsNullOrWhiteSpace(currentCell.OldValue))
+                                        {
+                                            //如果当前单元格内容是空 会存在点位偏差 直接不计算点位 把空单元格上的点位改成小数点对齐
+                                            cellRangeTabStopPositionList.ForEach(f => {
+                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, f.Position));
+                                            });
+                                        }
+                                        else
+                                        {
+                                           
+                                            var decimalPointPositionAbsDiffList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabDecimal)
+                                            .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCell.LeftMarginInfo.CellContentDecimalPointLeftMargin - s.Position) })
+                                            .OrderBy(o => o.AbsDiff).ToList();
+
+                                            var rightPositionAbsDiffResultList = cellRangeTabStopPositionList.Where(w => w.Alignment == WdTabAlignment.wdAlignTabRight)
+                                           .Select(s => new { s.Alignment, s.Position, AbsDiff = Math.Abs(currentCell.LeftMarginInfo.CellContentEndPointLeftMargin - s.Position) })
+                                           .OrderBy(o => o.AbsDiff).ToList();
+
+                                            if (decimalPointPositionAbsDiffList.Any() && rightPositionAbsDiffResultList.Any())
+                                            {
+                                                //居中 居右都有最近点位 取绝对值差最小的一个
+                                                var decimalPointPosition = decimalPointPositionAbsDiffList.FirstOrDefault();
+                                                var rightPosition = rightPositionAbsDiffResultList.FirstOrDefault();
+                                                if (decimalPointPosition.AbsDiff < rightPosition.AbsDiff)
+                                                {
+                                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPosition.Position));
+                                                }
+                                                else
+                                                {
+                                                    newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPosition.Position));
+                                                }
+                                            }
+                                            else if (decimalPointPositionAbsDiffList.Any())
+                                            {
+                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, decimalPointPositionAbsDiffList.FirstOrDefault().Position));
+                                            }
+                                            else if (rightPositionAbsDiffResultList.Any())
+                                            {
+                                                newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, rightPositionAbsDiffResultList.FirstOrDefault().Position));
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        //传入了点位 直接用外部传入点位
+                                        newTabStopPositionList.Add((WdTabAlignment.wdAlignTabDecimal, currentCellTabStopPosition));
+                                    }
+
+                                }
+                                else
+                                {
+                                    //当前列不是数据列 保留原始点位
+                                    cellRangeTabStopPositionList.ForEach(f => {
+                                        newTabStopPositionList.Add((f.Alignment, f.Position));
+                                    });
+                                }
                             }
+
                         }
 
+                        row.Range.Paragraphs.First.TabStops.ClearAll();
+                        newTabStopPositionList.ForEach(f =>
+                        {
+                            row.Range.Paragraphs.First.TabStops.Add(f.Position, f.Alignment);
+                        });
+
+
                     }
-
-                    row.Range.Paragraphs.First.TabStops.ClearAll();
-                    newTabStopPositionList.ForEach(f =>
-                    {
-                        row.Range.Paragraphs.First.TabStops.Add(f.Position, f.Alignment);
-                    });
-
-
+                    $"第{tabStopTable.PageNumber}页第{tabStopTable.TableNumber}个表格格式化完毕》》》".Console(ConsoleColor.Yellow);
                 }
+                catch(Exception ex)
+                {
+                    $"第{tabStopTable.PageNumber}页第{tabStopTable.TableNumber}个表格格式化完毕失败,{ex.Message}》》》".Console(ConsoleColor.Red);
+                }
+              
             }
             watch.Stop();
             $"耗时：{watch.ElapsedMilliseconds / 1000}秒".Console(ConsoleColor.Yellow);
@@ -1297,7 +1295,8 @@ namespace WordDemo
 
             foreach (var table in identifyFailTabStopTableList)
             {
-                MatchTabStopTableCellRange(table);
+                table.TableNumber = identifyFailTabStopTableList.IndexOf(table) + 1;
+                MatchTabStopTableCellRange(table,true);
 
                 int maxRowCellCount = table.Rows.Max(m => m.RowCells.Count);
                 if (table.HeadRows.Any(w => w.RowCells.Count != maxRowCellCount))
@@ -3260,7 +3259,8 @@ namespace WordDemo
         /// 匹配制表位表格单元格Range
         /// </summary>
         /// <param name="table"></param>
-        private static void MatchTabStopTableCellRange(WordTable table)
+        /// <param name="isComputeCellLeftMarginInfo"></param>
+        private static void MatchTabStopTableCellRange(WordTable table,bool isComputeCellLeftMarginInfo=false)
         {
             foreach (WordTableRow row in table.Rows)
             {
@@ -3349,6 +3349,14 @@ namespace WordDemo
                     nextCellStartIndex = cellEndIndex;
                     string moveCellValue = cell.Range.Text;
 
+                }
+
+                if(isComputeCellLeftMarginInfo)
+                for(int i=0;i<row.RowCells.Count;i++)
+                {
+                    var currentCell = row.RowCells[i];
+                    var nextCellRange = i < (row.RowCells.Count - 1) ? row.RowCells[i + 1] .Range: null;
+                    currentCell.LeftMarginInfo= GetCellLeftMarginInfo(currentCell.Range,nextCellRange);
                 }
             }
         }
@@ -4440,10 +4448,27 @@ namespace WordDemo
         /// 获取段落文本与正文最大左边距和段落文本中小数点与正文左边距
         /// </summary>
         /// <param name="range"></param>
+        /// <param name="nextRange"></param>
         /// <returns></returns>
-        private static (float CellContentMaxLeftMargin, float DecimalPointLeftMargin) GetCellContentLeftMarginInfo(Range range)
+        private static CellLeftMarginInfo GetCellLeftMarginInfo(Range range,Range nextRange)
         {
-            //计算\t或者\r的Range
+            var leftMarginInfo = new CellLeftMarginInfo();
+
+            //计算单元格左侧与正文左边距
+            leftMarginInfo.CellMinLeftMargin =(float) range.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+
+            //计算单元格右侧与正文左边距 
+            if (nextRange == null)
+            {
+                //如果当前单元格是当前行最后一个单元格 以页面宽作为左边距
+                leftMarginInfo.CellMaxLeftMargin= range.PageSetup.PageWidth;
+            }
+            else
+            {
+                leftMarginInfo.CellMaxLeftMargin= (float)nextRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+            }
+
+            //计算单元格内容结束位置与正文左边距
             Range contentRange = range.Duplicate;
             if (contentRange.Text.Contains("\t"))
             {
@@ -4455,21 +4480,22 @@ namespace WordDemo
                 var breakLineIndex = contentRange.Text.IndexOf("\r");
                 contentRange.MoveStart(WdUnits.wdCharacter, breakLineIndex);
             }
-            float cellContentMaxLeftMargin = (float)contentRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
-            float decimalPointLeftMargin = 0;
+            leftMarginInfo.CellContentEndPointLeftMargin = (float)contentRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+
+            //计算单元格内容小数点与正文左边距
             if (range.Text.Contains("."))
             {
                 int decimalPointIndex = range.Text.IndexOf(".");
                 Range decimalPointRange = range.Duplicate;
                 decimalPointRange.MoveStart(WdUnits.wdCharacter, decimalPointIndex);
-                decimalPointLeftMargin = (float)decimalPointRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
+                leftMarginInfo.CellContentDecimalPointLeftMargin = (float)decimalPointRange.Information[WdInformation.wdHorizontalPositionRelativeToTextBoundary];
             }
             else
             {
                 //没有小数点 小数点位置等于文本最大左边距
-                decimalPointLeftMargin = cellContentMaxLeftMargin;
+                leftMarginInfo.CellContentDecimalPointLeftMargin = leftMarginInfo.CellContentEndPointLeftMargin;
             }
-            return (cellContentMaxLeftMargin, decimalPointLeftMargin);
+            return leftMarginInfo;
         }
         #endregion
 
@@ -4519,24 +4545,29 @@ namespace WordDemo
 
                         var prePara = paragraphs[i - 1];
                         var nextPara = paragraphs[i + 1];
-
-                        int preRowTabCount = getTabStopsCount(prePara, true);//WordUtil.getTabStops(paras.get(i - 1), true).size();
-                        int nextRowTabCount = getTabStopsCount(nextPara, true);//WordUtil.getTabStops(paras.get(i + 1), true).size();
-
-                        //lxz 2021-11-判断表格列数应该大于1，一个表格至少两列，
-                        if (Math.Abs(preRowTabCount - nextRowTabCount) <= 1 && nextRowTabCount > 1 && preRowTabCount > 1)
+                        if(!string.IsNullOrWhiteSpace(prePara.Text)&&!string.IsNullOrWhiteSpace(nextPara.Text)
+                            &&prePara.OldText.Split('\t').Count()>1&&nextPara.OldText.Split('\t').Count()>1)
                         {
-                            //如果当前tabCount=1时可能为段落,增加长度小于等于50判断				zqb		2021-10-08 22:38
-                            //if (preRowTabCount != 1 && nextRowTabCount != 1 && (paras.get(i - 1).getText().length() <= 50 && paras.get(i + 1).getText().length() <= 50))
-                            if (preRowTabCount != 1 && nextRowTabCount != 1 && (prePara.Range.Text.Length <= 50 && nextPara.Range.Text.Length <= 50))
+
+                            int preRowTabCount = getTabStopsCount(prePara, true);//WordUtil.getTabStops(paras.get(i - 1), true).size();
+                            int nextRowTabCount = getTabStopsCount(nextPara, true);//WordUtil.getTabStops(paras.get(i + 1), true).size();
+
+                            //lxz 2021-11-判断表格列数应该大于1，一个表格至少两列，
+                            if (Math.Abs(preRowTabCount - nextRowTabCount) <= 1 && nextRowTabCount > 1 && preRowTabCount > 1)
                             {
-                                c_rows.Add(i - 1);
-                                if (tableFirst == false && i < tableRowStart)
+                                //如果当前tabCount=1时可能为段落,增加长度小于等于50判断				zqb		2021-10-08 22:38
+                                //if (preRowTabCount != 1 && nextRowTabCount != 1 && (paras.get(i - 1).getText().length() <= 50 && paras.get(i + 1).getText().length() <= 50))
+                                if (preRowTabCount != 1 && nextRowTabCount != 1 && (prePara.Range.Text.Length <= 50 && nextPara.Range.Text.Length <= 50))
                                 {
-                                    tableFirst = true;
+                                    c_rows.Add(i - 1);
+                                    if (tableFirst == false && i < tableRowStart)
+                                    {
+                                        tableFirst = true;
+                                    }
                                 }
                             }
                         }
+
                     }
                 }
             }
