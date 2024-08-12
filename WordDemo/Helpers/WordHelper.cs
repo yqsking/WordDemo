@@ -3352,12 +3352,15 @@ namespace WordDemo
                 }
 
                 if(isComputeCellLeftMarginInfo)
-                for(int i=0;i<row.RowCells.Count;i++)
                 {
-                    var currentCell = row.RowCells[i];
-                    var nextCellRange = i < (row.RowCells.Count - 1) ? row.RowCells[i + 1] .Range: null;
-                    currentCell.LeftMarginInfo= GetCellLeftMarginInfo(currentCell.Range,nextCellRange);
+                    for (int i = 0; i < row.RowCells.Count; i++)
+                    {
+                        var currentCell = row.RowCells[i];
+                        var nextCellRange = i < (row.RowCells.Count - 1) ? row.RowCells[i + 1].Range : null;
+                        currentCell.LeftMarginInfo = GetCellLeftMarginInfo(currentCell.Range, nextCellRange);
+                    }
                 }
+                
             }
         }
 
@@ -4545,15 +4548,18 @@ namespace WordDemo
 
                         var prePara = paragraphs[i - 1];
                         var nextPara = paragraphs[i + 1];
-                        if(!string.IsNullOrWhiteSpace(prePara.Text)&&!string.IsNullOrWhiteSpace(nextPara.Text)
-                            &&prePara.OldText.Split('\t').Count()>1&&nextPara.OldText.Split('\t').Count()>1)
+                        if (!string.IsNullOrWhiteSpace(prePara.Text) && !string.IsNullOrWhiteSpace(nextPara.Text)
+                       && prePara.OldText.Split('\t').Count() > 1 && nextPara.OldText.Split('\t').Count() > 1)
                         {
 
                             int preRowTabCount = getTabStopsCount(prePara, true);//WordUtil.getTabStops(paras.get(i - 1), true).size();
                             int nextRowTabCount = getTabStopsCount(nextPara, true);//WordUtil.getTabStops(paras.get(i + 1), true).size();
 
+                            //判断是否为制表位的表格,制表位大于1；TabStops默认14个,第二个不是第一个的倍数，正确的是后面一个是前面一个的两倍
+                            var isTabTableRow = chkParaTabStopIsTabTableRow(prePara) || chkParaTabStopIsTabTableRow(nextPara);
+
                             //lxz 2021-11-判断表格列数应该大于1，一个表格至少两列，
-                            if (Math.Abs(preRowTabCount - nextRowTabCount) <= 1 && nextRowTabCount > 1 && preRowTabCount > 1)
+                            if (Math.Abs(preRowTabCount - nextRowTabCount) <= 1 && nextRowTabCount > 1 && preRowTabCount > 1 && isTabTableRow)
                             {
                                 //如果当前tabCount=1时可能为段落,增加长度小于等于50判断				zqb		2021-10-08 22:38
                                 //if (preRowTabCount != 1 && nextRowTabCount != 1 && (paras.get(i - 1).getText().length() <= 50 && paras.get(i + 1).getText().length() <= 50))
@@ -5048,6 +5054,32 @@ namespace WordDemo
             }
             return result;
         }
+
+
+        private static bool chkParaTabStopIsTabTableRow(WordParagraph wordParagraph)
+        {
+            var paragraph = wordParagraph.Range.Paragraphs.First;
+            if (paragraph.TabStops == null)
+            {
+                return false;
+            }
+            var result = paragraph.TabStops.Count;
+            //判断是否为制表位的表格,制表位大于1；TabStops默认14个,第二个不是第一个的倍数，正确的是后面一个是前面一个的两倍
+
+            if (paragraph.TabStops.Count > 1 && paragraph.Range.Text.Contains("\t") && paragraph.TabStops[1].Position * 2 != paragraph.TabStops[2].Position)
+            {
+                return true;
+            }
+            else if (paragraph.TabStops.Count == 14
+                && paragraph.TabStops[1].Position * 2 == paragraph.TabStops[2].Position
+                && paragraph.TabStops[2].Position * 2 == paragraph.TabStops[3].Position
+                && paragraph.TabStops[5].Position * 2 == paragraph.TabStops[6].Position)
+            {
+                return false;
+            }
+            return false;
+        }
+
 
         private static float getIndent(Paragraph paragraph)
         {

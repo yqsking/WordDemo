@@ -3,7 +3,7 @@
 namespace WordDemo.Dtos
 {
     /// <summary>
-    /// 单元格左边距
+    /// 单元格左边距信息
     /// </summary>
     public class CellLeftMarginInfo
     {
@@ -31,10 +31,6 @@ namespace WordDemo.Dtos
         /// 单元格内容小数点与正文左边距
         /// </summary>
         public float CellContentDecimalPointLeftMargin { get; set; }
-
-      
-
-
 
 
     }
